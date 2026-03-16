@@ -93,18 +93,9 @@ export default function PaywallModal({
               ))}
             </View>
 
-            {/* Pricing — Lifetime first (best deal) */}
+            {/* Pricing — Annual highlighted as best deal */}
             <TouchableOpacity
               style={[styles.priceBtn, styles.priceBtnHighlight]}
-              onPress={() => handlePurchase('lifetime')}
-            >
-              <Text style={styles.priceBtnLabel}>Lifetime</Text>
-              <Text style={styles.priceAmt}>{PRICING.lifetime.price}</Text>
-              <Text style={styles.priceNote}>One-time purchase</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.priceBtn}
               onPress={() => handlePurchase('annual')}
             >
               <Text style={styles.priceBtnLabel}>Annual</Text>

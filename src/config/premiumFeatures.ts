@@ -120,16 +120,15 @@ export const PREMIUM_FEATURES: PremiumFeature[] = [
 
 export const FREE_LIMITS = {
   maxNotes: 10,
-  maxRefreshesPerCategory: 0, // Free = 1 suggestion per category (no refreshes)
+  maxRefreshesPerCategory: 3, // Free = up to 3 refreshes per category per day
   maxRemindersPerDay: 1,
 };
 
 // ─── Pricing ────────────────────────────────────────────────────────────────
 
 export const PRICING = {
-  monthly: { id: 'premium_monthly', price: '$4.99', period: 'month' },
-  annual: { id: 'premium_annual', price: '$29.99', period: 'year', savings: '50%' },
-  lifetime: { id: 'premium_lifetime', price: '$39.99', period: 'forever' },
+  monthly: { id: 'premium_monthly', price: '$6.99', period: 'month' },
+  annual:  { id: 'premium_annual',  price: '$39.99', period: 'year', savings: '52%' },
 } as const;
 
 export type PricingTier = keyof typeof PRICING;

@@ -8,9 +8,8 @@
  *   3. Set your REVENUECAT_API_KEY below
  *
  * Subscription tiers:
- *   Monthly:  $4.99/mo   → 'premium_monthly'
- *   Annual:   $29.99/yr  → 'premium_annual'
- *   Lifetime: $39.99     → 'premium_lifetime'
+ *   Monthly:  $6.99/mo   → 'premium_monthly'
+ *   Annual:   $39.99/yr  → 'premium_annual'  (save 52%)
  */
 
 import { PRICING, PricingTier } from '../config/premiumFeatures';
