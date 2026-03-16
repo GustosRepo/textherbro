@@ -14,7 +14,8 @@
 
 import { Partner, NoteEntry, Favorites, ActivityLog } from '../types/partner';
 import { pickOne } from '../utils/date';
-import { getAllPackTemplates } from '../config/templatePacks';
+import { getAllPackTemplates, getPackTemplatesFiltered, getPackById } from '../config/templatePacks';
+import type { PackId } from '../config/templatePacks';
 import { isPremium } from './premium';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -25,6 +26,7 @@ export interface Suggestions {
   compliments: string[];
   checkIns: string[];
   dateIdeas: string[];
+  deepQuestions: string[];
 }
 
 export interface SuggestionContext {
@@ -32,6 +34,7 @@ export interface SuggestionContext {
   birthdayDaysAway?: number | null;
   anniversaryDaysAway?: number | null;
   isPro?: boolean;
+  selectedPackId?: PackId | null;
 }
 
 // ─── Time of Day ────────────────────────────────────────────────────────────
@@ -56,9 +59,6 @@ export function generateSuggestions(
   const name = pickOne(rawName);
   const favs = partner?.favorites ?? {};
 
-  // Inject template pack content based on subscription status
-  const packTemplates = getAllPackTemplates(context?.isPro ?? false);
-
   // Bucket notes by category (use at most 10 recent per bucket)
   const byCategory = {
     'she-said': notes.filter((n) => n.category === 'she-said').slice(0, 10),
@@ -66,6 +66,34 @@ export function generateSuggestions(
     gift: notes.filter((n) => n.category === 'gift').slice(0, 10),
     general: notes.filter((n) => n.category === 'general').slice(0, 10),
   };
+
+  // When a specific PRO pack is selected, surface pack lines FIRST so the
+  // change is immediately visible when the user switches tones.
+  const specificId = context?.isPro && context?.selectedPackId && context.selectedPackId !== 'free'
+    ? context.selectedPackId
+    : null;
+  const selectedPack = specificId ? getPackById(specificId) : null;
+
+  if (selectedPack) {
+    return {
+      compliments: [
+        ...selectedPack.compliments,
+        ...scoreAndSort(buildCompliments(name, favs, byCategory, context), partner, notes),
+      ],
+      checkIns: [
+        ...selectedPack.checkIns,
+        ...scoreAndSort(buildCheckIns(name, favs, byCategory, context), partner, notes),
+      ],
+      dateIdeas: [
+        ...selectedPack.dateIdeas,
+        ...scoreAndSort(buildDateIdeas(name, favs, byCategory, context), partner, notes),
+      ],
+      deepQuestions: buildDeepQuestions(name, partner, notes),
+    };
+  }
+
+  // Default: blend generic lines with free-pack templates
+  const packTemplates = getPackTemplatesFiltered(context?.isPro ?? false, null);
 
   return {
     compliments: scoreAndSort(
@@ -83,6 +111,7 @@ export function generateSuggestions(
       partner,
       notes,
     ),
+    deepQuestions: buildDeepQuestions(name, partner, notes),
   };
 }
 
@@ -485,4 +514,73 @@ function shuffle(arr: string[]): string[] {
     [unique[i], unique[j]] = [unique[j], unique[i]];
   }
   return unique;
+}
+
+// ─── Deep Conversation Starters ─────────────────────────────────────────────
+
+/**
+ * Generates a pool of deep conversation-starter questions.
+ * PRO-only. These are designed to spark genuine connection,
+ * not just surface-level small talk.
+ */
+export function buildDeepQuestions(
+  name: string,
+  partner: Partner | null,
+  notes: NoteEntry[],
+): string[] {
+  const questions: string[] = [
+    // Self-knowledge
+    `What's something you believed 5 years ago that you no longer believe?`,
+    `What's your biggest fear that you've never told anyone?`,
+    `What's the version of yourself you're still working toward becoming?`,
+    `If you could change one thing about how you grew up, what would it be?`,
+    `What's a compliment you've gotten that actually stuck with you?`,
+    `What do you think your biggest personal growth area is right now?`,
+    `What's something you've always wanted to say but never found the right moment?`,
+    `When do you feel most like yourself?`,
+    `What's the hardest decision you've ever had to make?`,
+    `What part of your past took the longest to make peace with?`,
+
+    // Relationship depth
+    `What's something small I do that means a lot to you?`,
+    `What's something you wish I understood about you better?`,
+    `What do you think our relationship handles really well?`,
+    `What's one thing you want us to do more of together?`,
+    `What was the moment you knew we had something real?`,
+    `What's something about our future you're genuinely excited about?`,
+    `What's a moment when you felt truly seen by me?`,
+    `What does a perfect Saturday look like for us?`,
+    `What's something we haven't talked about that you've been thinking about?`,
+    `If we could solve one problem in our relationship, what would it be?`,
+
+    // Dreams & values
+    `What's something on your bucket list that feels impossible but you still want?`,
+    `What does your dream life look like in 10 years?`,
+    `What's a value you hold that most people don't know about you?`,
+    `What would you do if money was never a factor?`,
+    `What kind of legacy do you want to leave?`,
+    `What does success mean to you — like actually mean, not the Instagram version?`,
+    `What's something you've given up on that you wish you hadn't?`,
+    `If you could master any skill instantly, what would it be?`,
+
+    // Fun but deep
+    `What's the weirdest hill you'll die on?`,
+    `What's a part of your personality that surprises people?`,
+    `At what point in your life have you felt most alive?`,
+    `What do you think is the most underrated thing in life most people ignore?`,
+  ];
+
+  // Personalize with partner name
+  const personalized = questions.map((q) =>
+    Math.random() < 0.25 ? q.replace('your', `${name}'s`) : q,
+  );
+
+  // Add note-based questions
+  for (const note of notes.filter((n) => n.category === 'she-said').slice(0, 3)) {
+    personalized.push(
+      `You mentioned "${note.text}". What's the full story there?`,
+    );
+  }
+
+  return shuffle(personalized);
 }

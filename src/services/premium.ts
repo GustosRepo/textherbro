@@ -7,10 +7,14 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FREE_LIMITS } from '../config/premiumFeatures';
+import type { PackId } from '../config/templatePacks';
+import { getActivityLog, saveActivityLog } from './storage';
 
 const KEYS = {
   PREMIUM_STATUS: '@textherbro_premium',
   REFRESH_COUNTS: '@textherbro_refresh_counts',
+  SELECTED_TONE: '@textherbro_selected_tone',
+  SHIELD_DATA: '@textherbro_shields',
 };
 
 // ─── Refresh Count Tracking ─────────────────────────────────────────────────
@@ -82,4 +86,78 @@ export async function getRemainingRefreshes(category: RefreshCategory): Promise<
   if (await isPremium()) return Infinity;
   const counts = await getRefreshCounts();
   return Math.max(0, FREE_LIMITS.maxRefreshesPerCategory - counts[category]);
+}
+
+// ─── Tone / Pack Selection ───────────────────────────────────────────────────
+
+export async function getSelectedTone(): Promise<PackId> {
+  const raw = await AsyncStorage.getItem(KEYS.SELECTED_TONE);
+  return (raw as PackId) ?? 'free';
+}
+
+export async function setSelectedTone(packId: PackId): Promise<void> {
+  await AsyncStorage.setItem(KEYS.SELECTED_TONE, packId);
+}
+
+// ─── Streak Shields ─────────────────────────────────────────────────────────
+
+interface ShieldData {
+  count: number;
+  lastRefillWeek: string; // "YYYY-Wnn"
+}
+
+function getISOWeekKey(): string {
+  const d = new Date();
+  const startOfYear = new Date(d.getFullYear(), 0, 1);
+  const week = Math.ceil(((d.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7);
+  return `${d.getFullYear()}-W${String(week).padStart(2, '0')}`;
+}
+
+async function getShieldData(): Promise<ShieldData> {
+  const raw = await AsyncStorage.getItem(KEYS.SHIELD_DATA);
+  const currentWeek = getISOWeekKey();
+  if (!raw) return { count: 1, lastRefillWeek: currentWeek };
+  const data = JSON.parse(raw) as ShieldData;
+  if (data.lastRefillWeek !== currentWeek) {
+    // New week — refill to 1
+    return { count: 1, lastRefillWeek: currentWeek };
+  }
+  return data;
+}
+
+export async function getShieldCount(): Promise<number> {
+  if (!(await isPremium())) return 0;
+  const data = await getShieldData();
+  return data.count;
+}
+
+export async function canUseShield(): Promise<boolean> {
+  if (!(await isPremium())) return false;
+  const data = await getShieldData();
+  return data.count > 0;
+}
+
+/** Patch the given activity's timestamp to yesterday, preventing streak reset. */
+export async function applyShieldToStreak(
+  type: 'compliment' | 'checkIn' | 'date',
+): Promise<void> {
+  if (!(await canUseShield())) return;
+
+  const log = await getActivityLog();
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayISO = yesterday.toISOString();
+
+  if (type === 'compliment') log.lastCompliment = yesterdayISO;
+  else if (type === 'checkIn') log.lastCheckIn = yesterdayISO;
+  else log.lastDate = yesterdayISO;
+
+  await saveActivityLog(log);
+
+  // Consume the shield
+  const data = await getShieldData();
+  await AsyncStorage.setItem(
+    KEYS.SHIELD_DATA,
+    JSON.stringify({ count: Math.max(0, data.count - 1), lastRefillWeek: data.lastRefillWeek }),
+  );
 }

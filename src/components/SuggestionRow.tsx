@@ -8,6 +8,7 @@ interface SuggestionRowProps {
   onCopy: () => void;
   onNext: () => void;
   onDone: () => void;
+  onSave?: () => void;
 }
 
 export default function SuggestionRow({
@@ -17,12 +18,18 @@ export default function SuggestionRow({
   onCopy,
   onNext,
   onDone,
+  onSave,
 }: SuggestionRowProps) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.emoji}>{emoji}</Text>
         <Text style={styles.label}>{label}</Text>
+        {onSave && (
+          <TouchableOpacity onPress={onSave} style={styles.saveBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={styles.saveBtnText}>🔖</Text>
+          </TouchableOpacity>
+        )}
       </View>
       <Text style={styles.text}>{text}</Text>
       <View style={styles.actions}>
@@ -59,6 +66,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 1,
+    flex: 1,
+  },
+  saveBtn: {
+    marginLeft: 4,
+  },
+  saveBtnText: {
+    fontSize: 15,
   },
   text: {
     color: '#FFFFFF',

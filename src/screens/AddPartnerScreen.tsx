@@ -25,6 +25,7 @@ export default function AddPartnerScreen({ navigation }: any) {
   const [anniversary, setAnniversary] = useState('');
   const [favorites, setFavorites] = useState<Favorites>({});
   const [isEditing, setIsEditing] = useState(false);
+  const [existingId, setExistingId] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -35,6 +36,7 @@ export default function AddPartnerScreen({ navigation }: any) {
         setBirthday(existing.birthday);
         setAnniversary(existing.anniversary);
         setFavorites(existing.favorites ?? {});
+        setExistingId(existing.id);
         setIsEditing(true);
       }
     })();
@@ -61,6 +63,7 @@ export default function AddPartnerScreen({ navigation }: any) {
     }
 
     const partner: Partner = {
+      id: existingId ?? (Date.now().toString(36) + Math.random().toString(36).slice(2, 6)),
       name: name.trim(),
       nickname: nickname.trim() || undefined,
       birthday,

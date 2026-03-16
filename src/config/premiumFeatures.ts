@@ -12,7 +12,13 @@ export type PremiumFeatureKey =
   | 'weekly_report'
   | 'streak_shields'
   | 'score_history'
-  | 'advanced_reminders';
+  | 'advanced_reminders'
+  | 'sos_mode'
+  | 'saved_lines'
+  | 'smart_insights'
+  | 'deep_questions'
+  | 'multi_partner'
+  | 'milestones';
 
 // ─── Feature Definitions ────────────────────────────────────────────────────
 
@@ -39,13 +45,13 @@ export const PREMIUM_FEATURES: PremiumFeature[] = [
   {
     key: 'special_packs',
     label: 'Special Occasion Packs',
-    description: 'Birthday, anniversary, apology, and holiday suggestion packs.',
+    description: 'Birthday, anniversary, holiday, apology, and date night packs.',
     emoji: '🎁',
   },
   {
     key: 'tone_selector',
     label: 'Tone Selector',
-    description: 'Switch between funny, romantic, spicy, and sweet suggestions.',
+    description: 'Switch between romantic, funny, spicy, and more pack styles.',
     emoji: '🎭',
   },
   {
@@ -71,6 +77,42 @@ export const PREMIUM_FEATURES: PremiumFeature[] = [
     label: 'Advanced Reminders',
     description: 'Custom times, smart triggers, and streak warnings.',
     emoji: '⏰',
+  },
+  {
+    key: 'sos_mode',
+    label: 'SOS Mode',
+    description: 'Emergency recovery plan when things go cold. Step-by-step rescue.',
+    emoji: '🆘',
+  },
+  {
+    key: 'saved_lines',
+    label: 'My Playbook',
+    description: 'Save your best texts and come back to what works.',
+    emoji: '📓',
+  },
+  {
+    key: 'smart_insights',
+    label: 'Smart Insights',
+    description: 'AI-powered nudges based on your notes and activity.',
+    emoji: '💡',
+  },
+  {
+    key: 'deep_questions',
+    label: 'Deep Questions',
+    description: 'Meaningful conversation starters to actually connect.',
+    emoji: '💬',
+  },
+  {
+    key: 'multi_partner',
+    label: 'Multiple Partners',
+    description: 'Switch between separate partner profiles, each with their own streaks.',
+    emoji: '👥',
+  },
+  {
+    key: 'milestones',
+    label: 'Milestones Tracker',
+    description: 'Log your relationship milestones and celebrate them.',
+    emoji: '🏅',
   },
 ];
 

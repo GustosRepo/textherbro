@@ -28,6 +28,11 @@ export type PaywallReason =
   | 'notes_limit'
   | 'special_pack'
   | 'analytics'
+  | 'sos_mode'
+  | 'saved_lines'
+  | 'smart_insights'
+  | 'deep_questions'
+  | 'multi_partner'
   | 'general';
 
 // ─── Initialize ─────────────────────────────────────────────────────────────

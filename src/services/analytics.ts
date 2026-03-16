@@ -20,7 +20,16 @@ export type AnalyticsEvent =
   | 'streak_broken'
   | 'reminder_tapped'
   | 'paywall_shown'
-  | 'paywall_converted';
+  | 'paywall_converted'
+  | 'tone_selected'
+  | 'shield_used'
+  | 'line_saved'
+  | 'saved_line_used'
+  | 'saved_line_deleted'
+  | 'sos_scenario_selected'
+  | 'milestone_added'
+  | 'partner_switched'
+  | 'partner_deleted';
 
 export interface AnalyticsEntry {
   event: AnalyticsEvent;

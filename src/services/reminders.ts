@@ -3,6 +3,7 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { getPartner, getActivityLog } from './storage';
 import { isSameDay, isWithinDays, daysSince } from '../utils/date';
+import { isPremium } from './premium';
 
 // ─── Setup ──────────────────────────────────────────────────────────────────
 
@@ -93,113 +94,102 @@ function hoursSinceLastActivity(log: { lastCompliment: string | null; lastCheckI
   return (Date.now() - latest) / (1000 * 60 * 60);
 }
 
-export async function scheduleReminders(): Promise<void> {
+export async function scheduleReminders(
+  options: { hour?: number; minute?: number } = {},
+): Promise<void> {
   // Cancel existing before re-scheduling
   await Notifications.cancelAllScheduledNotificationsAsync();
 
   const log = await getActivityLog();
   const now = new Date().toISOString();
+  const userIsPro = await isPremium();
+  const reminderHour = options.hour ?? 18;
+  const reminderMinute = options.minute ?? 0;
 
-  // ── Fumble Escalation System ──
-  // 12h warning, 18h increased urgency, 24h critical
-  const hoursSince = hoursSinceLastActivity(log);
+  // ── PRO: Fumble Escalation System (12h / 18h / 24h) ──
+  if (userIsPro) {
+    const hoursSince = hoursSinceLastActivity(log);
 
-  if (hoursSince < 12) {
-    // Schedule a 12-hour warning from last activity
-    const triggerMs = (12 - hoursSince) * 60 * 60 * 1000;
-    if (triggerMs > 0) {
+    if (hoursSince < 12) {
+      const triggerMs = (12 - hoursSince) * 60 * 60 * 1000;
+      if (triggerMs > 0) {
+        await Notifications.scheduleNotificationAsync({
+          content: { title: 'Text Her Bro', body: randomMessage('fumbleWarning') },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+            seconds: Math.max(60, Math.round(triggerMs / 1000)),
+          },
+        });
+      }
+    } else if (hoursSince < 18) {
+      const triggerMs = (18 - hoursSince) * 60 * 60 * 1000;
+      if (triggerMs > 0) {
+        await Notifications.scheduleNotificationAsync({
+          content: { title: '⚠️ Fumble Alert', body: randomMessage('fumbleWarning') },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+            seconds: Math.max(60, Math.round(triggerMs / 1000)),
+          },
+        });
+      }
+    } else if (hoursSince < 24) {
+      const triggerMs = (24 - hoursSince) * 60 * 60 * 1000;
+      if (triggerMs > 0) {
+        await Notifications.scheduleNotificationAsync({
+          content: { title: '🚨 FUMBLE INCOMING', body: randomMessage('fumbleUrgent') },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+            seconds: Math.max(60, Math.round(triggerMs / 1000)),
+          },
+        });
+      }
+    } else {
       await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'Text Her Bro',
-          body: randomMessage('fumbleWarning'),
-        },
+        content: { title: '🚨 FUMBLE INCOMING', body: randomMessage('fumbleUrgent') },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-          seconds: Math.max(60, Math.round(triggerMs / 1000)),
+          seconds: 60,
         },
       });
     }
-  } else if (hoursSince < 18) {
-    // Already past 12h — schedule 18h warning
-    const triggerMs = (18 - hoursSince) * 60 * 60 * 1000;
-    if (triggerMs > 0) {
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: '⚠️ Fumble Alert',
-          body: randomMessage('fumbleWarning'),
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-          seconds: Math.max(60, Math.round(triggerMs / 1000)),
-        },
-      });
-    }
-  } else if (hoursSince < 24) {
-    // Past 18h — schedule urgent 24h alert
-    const triggerMs = (24 - hoursSince) * 60 * 60 * 1000;
-    if (triggerMs > 0) {
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: '🚨 FUMBLE INCOMING',
-          body: randomMessage('fumbleUrgent'),
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-          seconds: Math.max(60, Math.round(triggerMs / 1000)),
-        },
-      });
-    }
-  } else {
-    // Past 24h — send an immediate nudge + daily fallback
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: '🚨 FUMBLE INCOMING',
-        body: randomMessage('fumbleUrgent'),
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds: 60, // ~1 minute from now
-      },
-    });
   }
 
-  // ── Daily Check-in Reminder — only if no check-in today ──
+  // ── Daily Check-in Reminder (PRO: only if not checked in today; FREE: always) ──
   const didCheckInToday = log.lastCheckIn && isSameDay(log.lastCheckIn, now);
-  if (!didCheckInToday) {
+  if (!didCheckInToday || !userIsPro) {
     await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Text Her Bro',
-        body: randomMessage('checkIn'),
-      },
+      content: { title: 'Text Her Bro', body: randomMessage('checkIn') },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour: 18,
-        minute: 0,
+        hour: reminderHour,
+        minute: reminderMinute,
       },
     });
   }
 
-  // ── Compliment reminder — only if no compliment in 2+ days ──
-  const needsCompliment = !log.lastCompliment || !isWithinDays(log.lastCompliment, 2);
-  if (needsCompliment) {
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Text Her Bro',
-        body: randomMessage('compliment'),
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour: 12,
-        minute: 0,
-      },
-    });
+  // ── PRO: Compliment reminder — only if no compliment in 2+ days ──
+  if (userIsPro) {
+    const needsCompliment = !log.lastCompliment || !isWithinDays(log.lastCompliment, 2);
+    if (needsCompliment) {
+      const complimentHour = reminderHour > 12 ? reminderHour - 6 : 12;
+      await Notifications.scheduleNotificationAsync({
+        content: { title: 'Text Her Bro', body: randomMessage('compliment') },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour: complimentHour,
+          minute: reminderMinute,
+        },
+      });
+    }
   }
 
-  // Birthday & Anniversary — schedule 3 days before if partner exists
-  const partner = await getPartner();
-  if (partner) {
-    await scheduleDateReminder(partner.birthday, 'birthday');
-    await scheduleDateReminder(partner.anniversary, 'anniversary');
+  // ── PRO: Birthday & Anniversary reminders ──
+  if (userIsPro) {
+    const partner = await getPartner();
+    if (partner) {
+      await scheduleDateReminder(partner.birthday, 'birthday');
+      await scheduleDateReminder(partner.anniversary, 'anniversary');
+    }
   }
 }
 

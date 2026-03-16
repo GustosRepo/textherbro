@@ -7,7 +7,7 @@
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-export type PackId = 'free' | 'romantic' | 'funny' | 'spicy' | 'apology' | 'date_night';
+export type PackId = 'free' | 'romantic' | 'funny' | 'spicy' | 'apology' | 'date_night' | 'birthday' | 'anniversary' | 'holiday';
 
 export interface TemplatePack {
   id: PackId;
@@ -285,6 +285,135 @@ export const TEMPLATE_PACKS: TemplatePack[] = [
       "Outdoor movie screening. Blankets and popcorn.",
     ],
   },
+  {
+    id: 'birthday',
+    label: 'Birthday Pack',
+    emoji: '🎂',
+    description: "Her birthday is coming. Don't just wing it.",
+    isPremium: true,
+    compliments: [
+      "Happy birthday to the most beautiful woman I know.",
+      "Every year with you is better than the last.",
+      "I'm so lucky I get to celebrate you today.",
+      "You only get more amazing with time. Facts.",
+      "Today is about you. I hope it's everything you deserve.",
+      "Another year of being the greatest thing in my life.",
+      "You deserve the whole world on your birthday. I'll start with today.",
+      "Watching you grow is the best thing I get to witness.",
+      "You were born and everything got better. That's just the truth.",
+      "I love you more than you'll ever fully understand. Happy birthday.",
+    ],
+    checkIns: [
+      "Happy birthday! Today is all about you. What do you want to do?",
+      "It's your day, babe. I've got plans. Clear your schedule.",
+      "Just wanted to be the first to say happy birthday. Did I make it?",
+      "Did anyone sing to you yet? Because I'm prepared. Fair warning.",
+      "Tell me your birthday wish. Maybe I can make it happen.",
+      "What's something you've wanted to do for your birthday but never told me?",
+      "I've been planning today for a while. I hope it shows.",
+      "Birthday girl doesn't lift a finger today. That's the rule.",
+      "How are you feeling on your birthday? I want the real answer.",
+      "You deserve every good thing today. I'm going to make sure of it.",
+    ],
+    dateIdeas: [
+      "Spa day — I booked everything already.",
+      "Dinner at that restaurant she mentioned months ago.",
+      "Surprise her with a thoughtful gift only YOU would know to give.",
+      "Rent out her favorite activity for just the two of you.",
+      "Hotel night in the city. Let her pick the skyline.",
+      "Morning coffee delivery to bed. Then let her decide the rest.",
+      "Invite her closest friends for a surprise get-together.",
+      "Take her back to where your relationship started.",
+      "Write her a letter listing your favorite things about her.",
+      "Do a whole day of everything she loves, in order.",
+    ],
+  },
+  {
+    id: 'anniversary',
+    label: 'Anniversary Pack',
+    emoji: '💍',
+    description: 'Celebrate what you built. Make it count.',
+    isPremium: true,
+    compliments: [
+      "A whole year (or more) and I'd choose you every single time.",
+      "The best decision I ever made was choosing you.",
+      "You've made every day better since we started. I mean that.",
+      "I love who we are together. Don't ever change that.",
+      "Thank you for putting up with me. You're a saint and a queen.",
+      "I used to wonder what real love felt like. Now I know.",
+      "Every milestone means more because I get to share it with you.",
+      "You make me want to be a better man. And I'm working on it.",
+      "I didn't know it could be this good until you.",
+      "Here's to more years of us. I can't wait.",
+    ],
+    checkIns: [
+      "Happy anniversary. I can't believe how lucky I am.",
+      "What's your favorite memory of us from this past year?",
+      "I've been thinking about how far we've come. It's a lot.",
+      "Do you remember our first [date / text / conversation]? I do.",
+      "You still give me butterflies. Just so you know.",
+      "What do you want to do to celebrate us tonight?",
+      "I just want you to know — I'd do it all over again in a heartbeat.",
+      "Another year of you. I'm the luckiest.",
+      "Tell me something you love about us that you haven't said before.",
+      "We should celebrate bigger. What are you thinking?",
+    ],
+    dateIdeas: [
+      "Return to the place of your first date.",
+      "Recreate exactly what you did on Day 1.",
+      "Make a scrapbook of your best moments together.",
+      "Write each other letters with your favorite memories — read them out loud.",
+      "Book a night away. Same town, new energy.",
+      "Personalized gift: something that represents your story.",
+      "One-of-a-kind experience: hot air balloon, sunset sail, helicopter ride.",
+      "Private chef experience at home — candles, music, the whole thing.",
+      "Watch the video or look at photos from your first months together.",
+      "Plan the next year together. Trips, goals, adventures. Make it real.",
+    ],
+  },
+  {
+    id: 'holiday',
+    label: 'Holiday Pack',
+    emoji: '🎁',
+    description: 'Christmas, Valentine\'s, NYE — season-ready lines.',
+    isPremium: true,
+    compliments: [
+      "The best gift I ever got was you. Corny but facts.",
+      "This time of year hits different with you around.",
+      "You make every holiday feel special without even trying.",
+      "I'm grateful for you every day, but especially right now.",
+      "You're my favorite reason to celebrate.",
+      "Waking up to you during the holidays is everything.",
+      "You somehow make the whole season feel warmer.",
+      "Every holiday tradition is better because you're in it now.",
+      "The only thing on my wish list is more time with you.",
+      "You're my favorite part of every season.",
+    ],
+    checkIns: [
+      "What's your favorite holiday tradition? I want to make it ours.",
+      "Happy [holiday]! I'm so glad we get to spend this one together.",
+      "What are you most excited about this season?",
+      "Is there anything you really want this year? Tell me for real.",
+      "I want to start a new tradition with you this year. You in?",
+      "What does your ideal holiday look like? I'm taking notes.",
+      "This is one of my favorite times of year because I get to celebrate with you.",
+      "What's something you've always wanted to do around the holidays but never have?",
+      "I'm thinking about you extra today. What are you up to?",
+      "The holidays mean a lot more now that you're in my life.",
+    ],
+    dateIdeas: [
+      "Hot chocolate run and holiday light drive.",
+      "Christmas market or holiday festival just the two of you.",
+      "Cook a holiday meal together from scratch.",
+      "Matching pajamas and a holiday movie marathon.",
+      "Ice skating followed by dinner.",
+      "NYE countdown together — just you two, no crowded bar needed.",
+      "Valentine's dinner at her absolute favorite spot.",
+      "Write each other holiday cards. Real handwritten ones.",
+      "Buy each other one meaningful gift with a $30 budget.",
+      "Holiday staycation: decorate, cook, movies, no obligations.",
+    ],
+  },
 ];
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -307,5 +436,33 @@ export function getAllPackTemplates(isPro: boolean): {
     compliments: packs.flatMap(p => p.compliments),
     checkIns: packs.flatMap(p => p.checkIns),
     dateIdeas: packs.flatMap(p => p.dateIdeas),
+  };
+}
+
+/**
+ * Returns templates for a specific pack (or all if no pack selected).
+ * Always includes the free pack as a fallback base.
+ */
+export function getPackTemplatesFiltered(
+  isPro: boolean,
+  selectedPackId: PackId | null,
+): {
+  compliments: string[];
+  checkIns: string[];
+  dateIdeas: string[];
+} {
+  if (!selectedPackId || selectedPackId === 'free') {
+    return getAllPackTemplates(isPro);
+  }
+  const selected = getPackById(selectedPackId);
+  if (!selected || (selected.isPremium && !isPro)) {
+    return getAllPackTemplates(false);
+  }
+  // Combine free pack + selected premium pack for variety
+  const freePack = getPackById('free')!;
+  return {
+    compliments: [...freePack.compliments, ...selected.compliments],
+    checkIns: [...freePack.checkIns, ...selected.checkIns],
+    dateIdeas: [...freePack.dateIdeas, ...selected.dateIdeas],
   };
 }

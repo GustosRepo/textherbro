@@ -1,11 +1,16 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 
 interface StreakCardProps {
   label: string;
   streak: number;
   lastAction: string;
   emoji: string;
+  /** True when the streak is about to break (missed exactly 1 day) */
+  isShieldable?: boolean;
+  /** How many shields available */
+  shieldsAvailable?: number;
+  onUseShield?: () => void;
 }
 
 const getStreakVibe = (streak: number) => {
@@ -21,8 +26,12 @@ export default function StreakCard({
   streak,
   lastAction,
   emoji,
+  isShieldable = false,
+  shieldsAvailable = 0,
+  onUseShield,
 }: StreakCardProps) {
   const vibe = getStreakVibe(streak);
+  const showShield = isShieldable && shieldsAvailable > 0 && onUseShield;
 
   return (
     <View style={styles.card}>
@@ -33,6 +42,12 @@ export default function StreakCard({
           {vibe.fire ? <Text style={styles.fireText}>{vibe.fire}</Text> : null}
         </View>
         <Text style={styles.lastAction}>{lastAction}</Text>
+        {showShield && (
+          <TouchableOpacity style={styles.shieldBtn} onPress={onUseShield} activeOpacity={0.7}>
+            <Text style={styles.shieldBtnText}>🛡️ Use Shield</Text>
+            <Text style={styles.shieldCount}>{shieldsAvailable} left</Text>
+          </TouchableOpacity>
+        )}
       </View>
       <View style={[styles.streakBadge, streak === 0 && styles.streakBadgeDead]}>
         <Text style={[styles.streakNumber, { color: vibe.color }]}>{streak}</Text>
@@ -77,6 +92,29 @@ const styles = StyleSheet.create({
     color: '#666666',
     fontSize: 12,
     marginTop: 2,
+  },
+  shieldBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+    backgroundColor: '#1E3A1E',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#2D5A2D',
+  },
+  shieldBtnText: {
+    color: '#4CAF50',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  shieldCount: {
+    color: '#4CAF5099',
+    fontSize: 11,
+    fontWeight: '600',
   },
   streakBadge: {
     backgroundColor: '#F5C51820',

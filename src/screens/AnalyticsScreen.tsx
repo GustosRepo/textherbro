@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { getHistory, getActivityLog } from '../services/storage';
-import { getScoreHistory, getScoreTrend, ScoreTrend } from '../services/scoreHistory';
+import { getScoreHistory, getScoreTrend, ScoreTrend, ScoreSnapshot } from '../services/scoreHistory';
 import { getAnalyticsSummary, AnalyticsSummary } from '../services/analytics';
 import { isPremium } from '../services/premium';
 import { ActivityLog, ActivityHistoryEntry } from '../types/partner';
@@ -49,6 +49,7 @@ export default function AnalyticsScreen() {
   const [history, setHistory] = useState<ActivityHistoryEntry[]>([]);
   const [trend, setTrend] = useState<ScoreTrend | null>(null);
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
+  const [scoreHistory, setScoreHistory] = useState<ScoreSnapshot[]>([]);
   const [paywallVisible, setPaywallVisible] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -57,17 +58,19 @@ export default function AnalyticsScreen() {
 
     if (!premium) return;
 
-    const [activityLog, hist, scoreTrend, analyticsSummary] = await Promise.all([
+    const [activityLog, hist, scoreTrend, analyticsSummary, scoreHist] = await Promise.all([
       getActivityLog(),
       getHistory(),
       getScoreTrend(),
       getAnalyticsSummary(),
+      getScoreHistory(),
     ]);
 
     setLog(activityLog);
     setHistory(hist);
     setTrend(scoreTrend);
     setSummary(analyticsSummary);
+    setScoreHistory(scoreHist);
   }, []);
 
   useFocusEffect(
@@ -118,6 +121,19 @@ export default function AnalyticsScreen() {
     : 0;
   const fumbleCount = Math.max(0, daysSinceStart - uniqueActiveDays);
 
+  // Weekly report: last 7 days
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const thisWeekHistory = history.filter(h => new Date(h.timestamp).getTime() >= sevenDaysAgo);
+  const weekCompliments = thisWeekHistory.filter(h => h.type === 'compliment').length;
+  const weekCheckIns = thisWeekHistory.filter(h => h.type === 'checkIn').length;
+  const weekDates = thisWeekHistory.filter(h => h.type === 'date').length;
+  const weekActiveDays = new Set(thisWeekHistory.map(h => h.timestamp.slice(0, 10))).size;
+  const weekFumbleDays = 7 - weekActiveDays;
+
+  // Score history chart: last 14 snapshots
+  const chartData = scoreHistory.slice(-14);
+  const maxScore = chartData.length > 0 ? Math.max(...chartData.map(s => s.score), 1) : 100;
+
   const trendArrow = trend?.direction === 'up' ? '📈' : trend?.direction === 'down' ? '📉' : '➡️';
   const trendColor = trend?.direction === 'up' ? '#4CAF50' : trend?.direction === 'down' ? '#FF4444' : '#999999';
 
@@ -141,6 +157,50 @@ export default function AnalyticsScreen() {
           </View>
         </View>
       )}
+
+      {/* Score History Chart */}
+      {chartData.length > 1 && (
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Score History (14 days)</Text>
+          <View style={styles.chartContainer}>
+            {chartData.map((snap, i) => {
+              const barHeight = Math.max(4, Math.round((snap.score / maxScore) * 60));
+              const barColor = snap.score >= 70 ? '#4CAF50' : snap.score >= 40 ? '#F5C518' : '#FF4444';
+              const dayLabel = snap.date.slice(5); // MM-DD
+              return (
+                <View key={snap.date} style={styles.chartBar}>
+                  <Text style={styles.chartScore}>{snap.score}</Text>
+                  <View style={[styles.chartBarFill, { height: barHeight, backgroundColor: barColor }]} />
+                  <Text style={styles.chartDay}>{dayLabel}</Text>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      )}
+
+      {/* Weekly Report */}
+      <View style={styles.sectionCard}>
+        <Text style={styles.sectionTitle}>Weekly Report</Text>
+        <StatRow emoji="😍" label="Compliments This Week" value={weekCompliments} color="#F5C518" />
+        <StatRow emoji="💬" label="Check-ins This Week" value={weekCheckIns} color="#F5C518" />
+        <StatRow emoji="🌹" label="Dates This Week" value={weekDates} color="#F5C518" />
+        <StatRow emoji="✅" label="Active Days" value={`${weekActiveDays}/7`} color="#4CAF50" />
+        <StatRow
+          emoji="💀"
+          label="Fumble Days"
+          value={weekFumbleDays}
+          color={weekFumbleDays === 0 ? '#4CAF50' : weekFumbleDays <= 2 ? '#F5C518' : '#FF4444'}
+        />
+        {trend && (
+          <StatRow
+            emoji={trendArrow}
+            label="Score Change"
+            value={`${trend.change > 0 ? '+' : ''}${trend.change}`}
+            color={trendColor}
+          />
+        )}
+      </View>
 
       {/* Activity Stats */}
       <View style={styles.sectionCard}>
@@ -253,6 +313,37 @@ const styles = StyleSheet.create({
   trendChange: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  // Score History Chart
+  chartContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    paddingTop: 8,
+    height: 100,
+    gap: 3,
+  },
+  chartBar: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 3,
+  },
+  chartBarFill: {
+    width: '100%',
+    borderRadius: 3,
+    minHeight: 4,
+  },
+  chartScore: {
+    color: '#666666',
+    fontSize: 8,
+    fontWeight: '700',
+  },
+  chartDay: {
+    color: '#444444',
+    fontSize: 7,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   // Section Cards
   sectionCard: {

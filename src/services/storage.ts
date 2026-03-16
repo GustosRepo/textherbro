@@ -6,45 +6,141 @@ import {
   NoteCategory,
   AppSettings,
   ActivityHistoryEntry,
+  Milestone,
+  SavedLine,
   DEFAULT_ACTIVITY_LOG,
   DEFAULT_SETTINGS,
 } from '../types/partner';
 import { isWithinDays, isSameDay, isConsecutiveDay, daysSince } from '../utils/date';
 
 const KEYS = {
+  // Legacy single-partner keys (kept for migration)
   PARTNER: '@textherbro_partner',
   ACTIVITY_LOG: '@textherbro_activity_log',
-  NOTES: '@textherbro_notes_v2', // v2 = array format
-  SETTINGS: '@textherbro_settings',
+  NOTES: '@textherbro_notes_v2',
   HISTORY: '@textherbro_history',
+  // Multi-partner keys
+  ALL_PARTNERS: '@textherbro_all_partners',
+  ACTIVE_PARTNER_ID: '@textherbro_active_partner_id',
+  // Global keys
+  SETTINGS: '@textherbro_settings',
+  SAVED_LINES: '@textherbro_saved_lines',
+  MILESTONES: '@textherbro_milestones',
 };
 
-// ─── Partner ────────────────────────────────────────────────────────────────
-
-export async function savePartner(partner: Partner): Promise<void> {
-  await AsyncStorage.setItem(KEYS.PARTNER, JSON.stringify(partner));
+/** Generate a simple unique ID */
+function genId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
+
+/** Per-partner key prefix */
+function pk(base: string, partnerId: string): string {
+  return `${base}_${partnerId}`;
+}
+
+// ─── Multi-Partner Management ────────────────────────────────────────────────
+
+export async function getAllPartners(): Promise<Partner[]> {
+  const raw = await AsyncStorage.getItem(KEYS.ALL_PARTNERS);
+  return raw ? JSON.parse(raw) : [];
+}
+
+export async function saveAllPartners(partners: Partner[]): Promise<void> {
+  await AsyncStorage.setItem(KEYS.ALL_PARTNERS, JSON.stringify(partners));
+}
+
+export async function getActivePartnerId(): Promise<string | null> {
+  return AsyncStorage.getItem(KEYS.ACTIVE_PARTNER_ID);
+}
+
+export async function setActivePartnerId(id: string): Promise<void> {
+  await AsyncStorage.setItem(KEYS.ACTIVE_PARTNER_ID, id);
+}
+
+export async function addPartner(partner: Omit<Partner, 'id'>): Promise<Partner> {
+  const all = await getAllPartners();
+  const newPartner: Partner = { ...partner, id: genId() };
+  await saveAllPartners([...all, newPartner]);
+  if (all.length === 0) await setActivePartnerId(newPartner.id);
+  return newPartner;
+}
+
+export async function deletePartner(id: string): Promise<void> {
+  const all = await getAllPartners();
+  const updated = all.filter((p) => p.id !== id);
+  await saveAllPartners(updated);
+  const activeId = await getActivePartnerId();
+  if (activeId === id && updated.length > 0) {
+    await setActivePartnerId(updated[0].id);
+  }
+  // Clean up per-partner data
+  await AsyncStorage.multiRemove([
+    pk(KEYS.ACTIVITY_LOG, id),
+    pk(KEYS.NOTES, id),
+    pk(KEYS.HISTORY, id),
+  ]);
+}
+
+// ─── Partner (active) ────────────────────────────────────────────────────────
 
 export async function getPartner(): Promise<Partner | null> {
-  const raw = await AsyncStorage.getItem(KEYS.PARTNER);
-  if (!raw) return null;
-  const parsed = JSON.parse(raw);
-  // Migration: old schema had favoriteThings string and no favorites object
-  if (!parsed.favorites) {
-    parsed.favorites = {};
+  let partners = await getAllPartners();
+
+  // Migration: lift legacy single-partner into multi-partner store
+  if (partners.length === 0) {
+    const raw = await AsyncStorage.getItem(KEYS.PARTNER);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed.favorites) parsed.favorites = {};
+    if (!parsed.id) parsed.id = genId();
+    await saveAllPartners([parsed]);
+    await setActivePartnerId(parsed.id);
+
+    // Migrate per-partner data to keyed stores
+    const [logRaw, notesRaw, histRaw] = await Promise.all([
+      AsyncStorage.getItem(KEYS.ACTIVITY_LOG),
+      AsyncStorage.getItem(KEYS.NOTES),
+      AsyncStorage.getItem(KEYS.HISTORY),
+    ]);
+    if (logRaw)   await AsyncStorage.setItem(pk(KEYS.ACTIVITY_LOG, parsed.id), logRaw);
+    if (notesRaw) await AsyncStorage.setItem(pk(KEYS.NOTES, parsed.id), notesRaw);
+    if (histRaw)  await AsyncStorage.setItem(pk(KEYS.HISTORY, parsed.id), histRaw);
+
+    return parsed as Partner;
   }
-  return parsed as Partner;
+
+  const activeId = await getActivePartnerId();
+  return partners.find((p) => p.id === activeId) ?? partners[0];
 }
 
-// ─── Activity Log ───────────────────────────────────────────────────────────
+export async function savePartner(partner: Partner): Promise<void> {
+  const all = await getAllPartners();
+  let found = false;
+  const updated = all.map((p) => {
+    if (p.id === partner.id) { found = true; return partner; }
+    return p;
+  });
+  if (!found) updated.push(partner);
+  await saveAllPartners(updated);
+  await setActivePartnerId(partner.id);
+}
+
+// ─── Activity Log ─────────────────────────────────────────────────────────────
+
+async function activePartnerKey(base: string): Promise<string> {
+  const id = await getActivePartnerId();
+  return id ? pk(base, id) : base;
+}
 
 export async function getActivityLog(): Promise<ActivityLog> {
-  const raw = await AsyncStorage.getItem(KEYS.ACTIVITY_LOG);
+  const key = await activePartnerKey(KEYS.ACTIVITY_LOG);
+  const raw = await AsyncStorage.getItem(key);
   return raw ? (JSON.parse(raw) as ActivityLog) : { ...DEFAULT_ACTIVITY_LOG };
 }
 
 export async function saveActivityLog(log: ActivityLog): Promise<void> {
-  await AsyncStorage.setItem(KEYS.ACTIVITY_LOG, JSON.stringify(log));
+  const key = await activePartnerKey(KEYS.ACTIVITY_LOG);
+  await AsyncStorage.setItem(key, JSON.stringify(log));
 }
 
 /**
@@ -117,15 +213,16 @@ export async function logActivity(
 // ─── Notes (Memory Bank) ────────────────────────────────────────────────────
 
 export async function getNoteEntries(): Promise<NoteEntry[]> {
-  const raw = await AsyncStorage.getItem(KEYS.NOTES);
+  const key = await activePartnerKey(KEYS.NOTES);
+  const raw = await AsyncStorage.getItem(key);
   if (!raw) return [];
   const parsed = JSON.parse(raw) as NoteEntry[];
-  // Migration: old notes without category default to 'general'
   return parsed.map((n) => ({ ...n, category: n.category ?? 'general' }));
 }
 
 export async function saveNoteEntries(notes: NoteEntry[]): Promise<void> {
-  await AsyncStorage.setItem(KEYS.NOTES, JSON.stringify(notes));
+  const key = await activePartnerKey(KEYS.NOTES);
+  await AsyncStorage.setItem(key, JSON.stringify(notes));
 }
 
 export async function addNoteEntry(
@@ -154,27 +251,88 @@ export async function deleteNoteEntry(id: string): Promise<NoteEntry[]> {
 // ─── Activity History ───────────────────────────────────────────────────────
 
 export async function getHistory(): Promise<ActivityHistoryEntry[]> {
-  const raw = await AsyncStorage.getItem(KEYS.HISTORY);
+  const key = await activePartnerKey(KEYS.HISTORY);
+  const raw = await AsyncStorage.getItem(key);
   return raw ? (JSON.parse(raw) as ActivityHistoryEntry[]) : [];
 }
 
 async function addHistoryEntry(type: 'compliment' | 'checkIn' | 'date'): Promise<void> {
+  const key = await activePartnerKey(KEYS.HISTORY);
   const history = await getHistory();
   const entry: ActivityHistoryEntry = {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
     type,
     timestamp: new Date().toISOString(),
   };
-  // Keep last 100 entries max
   const updated = [entry, ...history].slice(0, 100);
-  await AsyncStorage.setItem(KEYS.HISTORY, JSON.stringify(updated));
+  await AsyncStorage.setItem(key, JSON.stringify(updated));
+}
+
+// ─── Saved Lines (Playbook) ───────────────────────────────────────────────────────────
+
+export async function getSavedLines(): Promise<SavedLine[]> {
+  const raw = await AsyncStorage.getItem(KEYS.SAVED_LINES);
+  return raw ? JSON.parse(raw) : [];
+}
+
+export async function saveLine(text: string, category: SavedLine['category']): Promise<SavedLine[]> {
+  const lines = await getSavedLines();
+  const entry: SavedLine = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    text,
+    category,
+    savedAt: new Date().toISOString(),
+    timesUsed: 0,
+  };
+  const updated = [entry, ...lines];
+  await AsyncStorage.setItem(KEYS.SAVED_LINES, JSON.stringify(updated));
+  return updated;
+}
+
+export async function deleteSavedLine(id: string): Promise<SavedLine[]> {
+  const lines = await getSavedLines();
+  const updated = lines.filter((l) => l.id !== id);
+  await AsyncStorage.setItem(KEYS.SAVED_LINES, JSON.stringify(updated));
+  return updated;
+}
+
+export async function incrementLineUsage(id: string): Promise<void> {
+  const lines = await getSavedLines();
+  const updated = lines.map((l) => l.id === id ? { ...l, timesUsed: l.timesUsed + 1 } : l);
+  await AsyncStorage.setItem(KEYS.SAVED_LINES, JSON.stringify(updated));
+}
+
+// ─── Milestones ───────────────────────────────────────────────────────────────
+
+export async function getMilestones(): Promise<Milestone[]> {
+  const raw = await AsyncStorage.getItem(KEYS.MILESTONES);
+  const all: Milestone[] = raw ? JSON.parse(raw) : [];
+  return all.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+}
+
+export async function addMilestone(milestone: Omit<Milestone, 'id'>): Promise<Milestone[]> {
+  const all = await getMilestones();
+  const entry: Milestone = { ...milestone, id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6) };
+  const updated = [...all, entry];
+  await AsyncStorage.setItem(KEYS.MILESTONES, JSON.stringify(updated));
+  return updated.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+}
+
+export async function deleteMilestone(id: string): Promise<Milestone[]> {
+  const all = await getMilestones();
+  const updated = all.filter((m) => m.id !== id);
+  await AsyncStorage.setItem(KEYS.MILESTONES, JSON.stringify(updated));
+  return updated;
 }
 
 // ─── Settings ───────────────────────────────────────────────────────────────
 
 export async function getSettings(): Promise<AppSettings> {
   const raw = await AsyncStorage.getItem(KEYS.SETTINGS);
-  return raw ? (JSON.parse(raw) as AppSettings) : { ...DEFAULT_SETTINGS };
+  if (!raw) return { ...DEFAULT_SETTINGS };
+  const parsed = JSON.parse(raw) as Partial<AppSettings>;
+  // Migration: fill in any missing fields with defaults
+  return { ...DEFAULT_SETTINGS, ...parsed };
 }
 
 export async function saveSettings(settings: AppSettings): Promise<void> {
