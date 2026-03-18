@@ -127,8 +127,8 @@ export const FREE_LIMITS = {
 // ─── Pricing ────────────────────────────────────────────────────────────────
 
 export const PRICING = {
-  monthly: { id: 'premium_monthly', price: '$6.99', period: 'month' },
-  annual:  { id: 'premium_annual',  price: '$39.99', period: 'year', savings: '52%' },
+  monthly: { id: 'premium_monthly', price: '$4.99', period: 'month' },
+  annual:  { id: 'premium_annual',  price: '$29.99', period: 'year', savings: '50%' },
 } as const;
 
 export type PricingTier = keyof typeof PRICING;

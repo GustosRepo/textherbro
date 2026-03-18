@@ -24,6 +24,7 @@ const KEYS = {
   ACTIVE_PARTNER_ID: '@textherbro_active_partner_id',
   // Global keys
   SETTINGS: '@textherbro_settings',
+  // Per-partner keys (formerly global — migrated on first access)
   SAVED_LINES: '@textherbro_saved_lines',
   MILESTONES: '@textherbro_milestones',
 };
@@ -78,6 +79,8 @@ export async function deletePartner(id: string): Promise<void> {
     pk(KEYS.ACTIVITY_LOG, id),
     pk(KEYS.NOTES, id),
     pk(KEYS.HISTORY, id),
+    pk(KEYS.SAVED_LINES, id),
+    pk(KEYS.MILESTONES, id),
   ]);
 }
 
@@ -271,11 +274,24 @@ async function addHistoryEntry(type: 'compliment' | 'checkIn' | 'date'): Promise
 // ─── Saved Lines (Playbook) ───────────────────────────────────────────────────────────
 
 export async function getSavedLines(): Promise<SavedLine[]> {
-  const raw = await AsyncStorage.getItem(KEYS.SAVED_LINES);
+  const key = await activePartnerKey(KEYS.SAVED_LINES);
+  let raw = await AsyncStorage.getItem(key);
+
+  // Lazy migration: lift global key into partner-scoped key on first access
+  if (raw === null) {
+    const globalRaw = await AsyncStorage.getItem(KEYS.SAVED_LINES);
+    if (globalRaw) {
+      await AsyncStorage.setItem(key, globalRaw);
+      await AsyncStorage.removeItem(KEYS.SAVED_LINES);
+      raw = globalRaw;
+    }
+  }
+
   return raw ? JSON.parse(raw) : [];
 }
 
 export async function saveLine(text: string, category: SavedLine['category']): Promise<SavedLine[]> {
+  const key = await activePartnerKey(KEYS.SAVED_LINES);
   const lines = await getSavedLines();
   const entry: SavedLine = {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
@@ -285,43 +301,59 @@ export async function saveLine(text: string, category: SavedLine['category']): P
     timesUsed: 0,
   };
   const updated = [entry, ...lines];
-  await AsyncStorage.setItem(KEYS.SAVED_LINES, JSON.stringify(updated));
+  await AsyncStorage.setItem(key, JSON.stringify(updated));
   return updated;
 }
 
 export async function deleteSavedLine(id: string): Promise<SavedLine[]> {
+  const key = await activePartnerKey(KEYS.SAVED_LINES);
   const lines = await getSavedLines();
   const updated = lines.filter((l) => l.id !== id);
-  await AsyncStorage.setItem(KEYS.SAVED_LINES, JSON.stringify(updated));
+  await AsyncStorage.setItem(key, JSON.stringify(updated));
   return updated;
 }
 
 export async function incrementLineUsage(id: string): Promise<void> {
+  const key = await activePartnerKey(KEYS.SAVED_LINES);
   const lines = await getSavedLines();
   const updated = lines.map((l) => l.id === id ? { ...l, timesUsed: l.timesUsed + 1 } : l);
-  await AsyncStorage.setItem(KEYS.SAVED_LINES, JSON.stringify(updated));
+  await AsyncStorage.setItem(key, JSON.stringify(updated));
 }
 
 // ─── Milestones ───────────────────────────────────────────────────────────────
 
 export async function getMilestones(): Promise<Milestone[]> {
-  const raw = await AsyncStorage.getItem(KEYS.MILESTONES);
+  const key = await activePartnerKey(KEYS.MILESTONES);
+  let raw = await AsyncStorage.getItem(key);
+
+  // Lazy migration: lift global key into partner-scoped key on first access
+  if (raw === null) {
+    const globalRaw = await AsyncStorage.getItem(KEYS.MILESTONES);
+    if (globalRaw) {
+      await AsyncStorage.setItem(key, globalRaw);
+      await AsyncStorage.removeItem(KEYS.MILESTONES);
+      raw = globalRaw;
+    }
+  }
+
   const all: Milestone[] = raw ? JSON.parse(raw) : [];
   return all.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
 
 export async function addMilestone(milestone: Omit<Milestone, 'id'>): Promise<Milestone[]> {
+  const key = await activePartnerKey(KEYS.MILESTONES);
   const all = await getMilestones();
   const entry: Milestone = { ...milestone, id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6) };
   const updated = [...all, entry];
-  await AsyncStorage.setItem(KEYS.MILESTONES, JSON.stringify(updated));
+  await AsyncStorage.setItem(key, JSON.stringify(updated));
   return updated.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
 
 export async function deleteMilestone(id: string): Promise<Milestone[]> {
+  const key = await activePartnerKey(KEYS.MILESTONES);
   const all = await getMilestones();
   const updated = all.filter((m) => m.id !== id);
-  await AsyncStorage.setItem(KEYS.MILESTONES, JSON.stringify(updated));
+  await AsyncStorage.setItem(key, JSON.stringify(updated));
   return updated;
 }
 

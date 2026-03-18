@@ -1,15 +1,14 @@
 /**
- * Paywall & In-App Purchase service.
+ * Paywall & In-App Purchase service — RevenueCat implementation.
  *
- * Currently uses AsyncStorage as a local mock for development.
- * When ready for production:
- *   1. npx expo install react-native-purchases
- *   2. Replace the mock functions below with actual RevenueCat calls
- *   3. Set your REVENUECAT_API_KEY below
+ * Product IDs (must match App Store Connect exactly):
+ *   Monthly:  'premium_monthly'   $4.99/mo
+ *   Annual:   'premium_annual'    $29.99/yr  (save 50%)
  *
- * Subscription tiers:
- *   Monthly:  $6.99/mo   → 'premium_monthly'
- *   Annual:   $39.99/yr  → 'premium_annual'  (save 52%)
+ * Setup:
+ *   1. Replace REVENUECAT_API_KEY below with your key from app.revenuecat.com
+ *   2. Create products in App Store Connect then add them to a RevenueCat Offering
+ *   3. Run pod install after adding react-native-purchases
  */
 
 import { PRICING, PricingTier } from '../config/premiumFeatures';
@@ -18,7 +17,10 @@ import { trackEvent } from './analytics';
 
 // ─── RevenueCat Configuration ───────────────────────────────────────────────
 
-const _REVENUECAT_API_KEY = '__YOUR_REVENUECAT_API_KEY__';
+// ⚠️  Replace with your key from https://app.revenuecat.com → Project → API Keys
+export const REVENUECAT_API_KEY: string = 'appl_HESqzhchdJRpLJGPGwMREFOFfjg';
+
+const IS_CONFIGURED = REVENUECAT_API_KEY !== '__YOUR_REVENUECAT_API_KEY__';
 
 // ─── Paywall Reason ─────────────────────────────────────────────────────────
 
@@ -37,19 +39,32 @@ export type PaywallReason =
 // ─── Initialize ─────────────────────────────────────────────────────────────
 
 export async function initializeRevenueCat(): Promise<void> {
-  // TODO: Replace with actual RevenueCat initialization
-  // import Purchases from 'react-native-purchases';
-  // Purchases.configure({ apiKey: _REVENUECAT_API_KEY });
-  console.log('[Paywall] RevenueCat ready (mock mode)');
+  if (!IS_CONFIGURED) {
+    console.log('[Paywall] RevenueCat not yet configured — running in mock mode');
+    return;
+  }
+  try {
+    const Purchases = (await import('react-native-purchases')).default;
+    await Purchases.configure({ apiKey: REVENUECAT_API_KEY });
+    console.log('[Paywall] RevenueCat initialized');
+  } catch (e) {
+    console.warn('[Paywall] RevenueCat init failed:', e);
+  }
 }
 
 // ─── Subscription Status ────────────────────────────────────────────────────
 
 export async function checkSubscriptionStatus(): Promise<boolean> {
-  // TODO: Replace with RevenueCat check
-  // const customerInfo = await Purchases.getCustomerInfo();
-  // return customerInfo.entitlements.active['premium'] !== undefined;
-  return isPremium();
+  if (!IS_CONFIGURED) return isPremium();
+  try {
+    const Purchases = (await import('react-native-purchases')).default;
+    const customerInfo = await Purchases.getCustomerInfo();
+    const active = customerInfo.entitlements.active['premium'] !== undefined;
+    await setPremiumStatus(active);
+    return active;
+  } catch {
+    return isPremium();
+  }
 }
 
 // ─── Purchase ───────────────────────────────────────────────────────────────
@@ -61,41 +76,57 @@ export interface PurchaseResult {
 
 export async function purchasePremium(tier: PricingTier): Promise<PurchaseResult> {
   const product = PRICING[tier];
+  const productId = product.id;
 
-  try {
-    // TODO: Replace with actual RevenueCat purchase
-    // const offerings = await Purchases.getOfferings();
-    // const pkg = offerings.current?.availablePackages.find(...);
-    // const { customerInfo } = await Purchases.purchasePackage(pkg);
-    // if (customerInfo.entitlements.active['premium']) { ... }
-
-    // Mock: activate premium locally
+  if (!IS_CONFIGURED) {
+    // Mock mode for development
     await setPremiumStatus(true);
     await trackEvent('paywall_converted', { tier, price: product.price });
-    return {
-      success: true,
-      message: `Premium activated! (${product.price}/${product.period})`,
-    };
-  } catch (e) {
-    return { success: false, message: 'Purchase failed. Try again.' };
+    return { success: true, message: `Premium activated! (${product.price}/${product.period})` };
+  }
+
+  try {
+    const Purchases = (await import('react-native-purchases')).default;
+    const offerings = await Purchases.getOfferings();
+    const pkg = offerings.current?.availablePackages.find(
+      (p) => p.product.identifier === productId,
+    );
+    if (!pkg) {
+      return { success: false, message: 'Product not found. Try again later.' };
+    }
+    const { customerInfo } = await Purchases.purchasePackage(pkg);
+    const active = customerInfo.entitlements.active['premium'] !== undefined;
+    if (active) {
+      await setPremiumStatus(true);
+      await trackEvent('paywall_converted', { tier, price: product.price });
+      return { success: true, message: `Premium activated! You're all set 👑` };
+    }
+    return { success: false, message: 'Purchase incomplete. Please try again.' };
+  } catch (e: any) {
+    if (e?.userCancelled) return { success: false, message: 'Purchase cancelled.' };
+    return { success: false, message: 'Purchase failed. Please try again.' };
   }
 }
 
 // ─── Restore ────────────────────────────────────────────────────────────────
 
 export async function restorePurchases(): Promise<PurchaseResult> {
-  try {
-    // TODO: Replace with actual RevenueCat restore
-    // const customerInfo = await Purchases.restorePurchases();
-    // const hasPremium = customerInfo.entitlements.active['premium'] !== undefined;
-
+  if (!IS_CONFIGURED) {
     const hasPremium = await isPremium();
-    if (hasPremium) {
-      return { success: true, message: 'Purchases restored! Premium is active.' };
-    }
+    if (hasPremium) return { success: true, message: 'Purchases restored! Premium is active.' };
     return { success: false, message: 'No previous purchases found.' };
+  }
+  try {
+    const Purchases = (await import('react-native-purchases')).default;
+    const customerInfo = await Purchases.restorePurchases();
+    const active = customerInfo.entitlements.active['premium'] !== undefined;
+    if (active) {
+      await setPremiumStatus(true);
+      return { success: true, message: 'Purchases restored! Premium is active 👑' };
+    }
+    return { success: false, message: 'No active subscription found.' };
   } catch {
-    return { success: false, message: 'Restore failed. Try again.' };
+    return { success: false, message: 'Restore failed. Please try again.' };
   }
 }
 

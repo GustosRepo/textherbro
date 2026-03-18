@@ -144,10 +144,10 @@ export default function PlaybookScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0A0A0A' },
-  header: { padding: 20, paddingTop: 60, paddingBottom: 8 },
+  header: { padding: 20, paddingTop: 16, paddingBottom: 8 },
   title: { color: '#FFFFFF', fontSize: 28, fontWeight: '900', marginBottom: 4 },
   subtitle: { color: '#666666', fontSize: 14 },
-  filterRow: { paddingHorizontal: 20, paddingVertical: 12, gap: 8 },
+  filterRow: { paddingHorizontal: 20, paddingVertical: 12, gap: 8, alignItems: 'center' },
   filterChip: {
     paddingHorizontal: 14, paddingVertical: 8,
     borderRadius: 20, backgroundColor: '#161616',

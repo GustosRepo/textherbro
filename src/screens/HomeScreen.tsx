@@ -46,6 +46,7 @@ import { AwardedBadge, checkAndAwardBadges } from '../services/badges';
 import { recordDailyScore } from '../services/scoreHistory';
 import { trackEvent } from '../services/analytics';
 import { PaywallReason } from '../services/paywall';
+import { shouldShowStreakPaywall, markStreakPaywallShown, maybeRequestReview } from '../services/engagement';
 import type { PackId } from '../config/templatePacks';
 import { syncWidget } from '../services/widget';
 
@@ -194,6 +195,22 @@ export default function HomeScreen({ navigation }: any) {
     setFumbles(getFumbleAlerts(updated));
     setFumbleRisk(calculateFumbleRisk(updated));
     trackEvent('activity_logged', { type });
+
+    // Proactive paywall: show once when compliment streak hits 3+
+    if (!isPro && updated.complimentStreak >= 3) {
+      const show = await shouldShowStreakPaywall(updated.complimentStreak);
+      if (show) {
+        await markStreakPaywallShown();
+        setPaywallReason('general');
+        setPaywallVisible(true);
+        return;
+      }
+    }
+
+    // Review prompt: fire on 3-day streak milestones
+    if (updated.complimentStreak === 3 || updated.checkInStreak === 3) {
+      await maybeRequestReview();
+    }
   };
 
   const handleCopied = () => {

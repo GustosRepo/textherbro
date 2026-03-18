@@ -1,9 +1,12 @@
-import React, { useEffect } from 'react';
-import { StatusBar } from 'expo-status-bar';
+import React, { useEffect, useState } from 'react';
+import { View } from 'react-native';
+import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import OnboardingScreen from './src/screens/OnboardingScreen';
 
 import HomeScreen from './src/screens/HomeScreen';
 import AddPartnerScreen from './src/screens/AddPartnerScreen';
@@ -73,11 +76,18 @@ function TabNavigator() {
   );
 }
 
+const ONBOARDING_KEY = '@textherbro_onboarding_done';
+
 export default function App() {
+  const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
+
   useEffect(() => {
     (async () => {
       await initializeRevenueCat();
       await trackEvent('app_open');
+
+      const done = await AsyncStorage.getItem(ONBOARDING_KEY);
+      setOnboardingDone(done === 'true');
 
       const settings = await getSettings();
       if (settings.remindersEnabled) {
@@ -89,9 +99,28 @@ export default function App() {
     })();
   }, []);
 
+  const handleOnboardingComplete = async () => {
+    await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+    setOnboardingDone(true);
+  };
+
+  // Still loading — render nothing (splash screen stays visible)
+  if (onboardingDone === null) {
+    return <View style={{ flex: 1, backgroundColor: '#0A0A0A' }} />;
+  }
+
+  if (!onboardingDone) {
+    return (
+      <>
+        <ExpoStatusBar style="light" />
+        <OnboardingScreen onComplete={handleOnboardingComplete} />
+      </>
+    );
+  }
+
   return (
     <>
-      <StatusBar style="light" />
+      <ExpoStatusBar style="light" />
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Tabs" component={TabNavigator} />

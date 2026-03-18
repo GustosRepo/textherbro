@@ -8,7 +8,12 @@ import {
   Alert,
   Image,
   ScrollView,
+  Linking,
 } from 'react-native';
+
+const PRIVACY_URL = 'https://code-werx.com/textherbro-privacy';
+const TERMS_URL = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
+const SUPPORT_EMAIL = 'mailto:support@textherbro.com';
 
 const MASCOT_REFLECTING = require('../../assets/mascot/relfectingmascot.png');
 import { useFocusEffect } from '@react-navigation/native';
@@ -182,11 +187,36 @@ export default function SettingsScreen({ navigation }: any) {
         </TouchableOpacity>
       )}
 
+      {/* Legal & Support */}
+      <TouchableOpacity
+        style={styles.settingRow}
+        onPress={() => Linking.openURL(PRIVACY_URL)}
+      >
+        <Text style={styles.settingLabel}>Privacy Policy</Text>
+        <Text style={styles.chevron}>›</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.settingRow}
+        onPress={() => Linking.openURL(TERMS_URL)}
+      >
+        <Text style={styles.settingLabel}>Terms of Service</Text>
+        <Text style={styles.chevron}>›</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.settingRow}
+        onPress={() => Linking.openURL(SUPPORT_EMAIL)}
+      >
+        <Text style={styles.settingLabel}>Contact Support</Text>
+        <Text style={styles.chevron}>›</Text>
+      </TouchableOpacity>
+
       {/* App info */}
       <View style={styles.footer}>
         <Image source={MASCOT_REFLECTING} style={styles.footerMascot} resizeMode="contain" />
         <Text style={styles.appName}>Text Her Bro</Text>
-        <Text style={styles.version}>v1.0.0 • MVP</Text>
+        <Text style={styles.version}>v1.0.0</Text>
         <Text style={styles.tagline}>
           Don't be that guy. 💀
         </Text>

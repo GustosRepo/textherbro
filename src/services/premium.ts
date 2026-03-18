@@ -161,3 +161,16 @@ export async function applyShieldToStreak(
     JSON.stringify({ count: Math.max(0, data.count - 1), lastRefillWeek: data.lastRefillWeek }),
   );
 }
+
+// ─── Feature Gates ───────────────────────────────────────────────────────────
+
+/** SOS mode is premium-only. */
+export async function canUseSOS(): Promise<boolean> {
+  return isPremium();
+}
+
+/** Free users can only have 1 partner. */
+export async function canAddPartner(currentCount: number): Promise<boolean> {
+  if (await isPremium()) return true;
+  return currentCount < 1;
+}

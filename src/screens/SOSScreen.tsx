@@ -2,7 +2,7 @@
  * SOS Screen — Emergency relationship recovery mode.
  * PRO only.
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,8 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { getSOSPlan, SOS_SCENARIOS, SOSScenario, SOSStep } from '../services/sos';
 import { trackEvent } from '../services/analytics';
+import { canUseSOS } from '../services/premium';
+import PaywallModal from '../components/PaywallModal';
 
 function StepCard({ step }: { step: SOSStep }) {
   const copyMessage = async () => {
@@ -48,6 +50,12 @@ function StepCard({ step }: { step: SOSStep }) {
 
 export default function SOSScreen() {
   const [selected, setSelected] = useState<SOSScenario | null>(null);
+  const [isPro, setIsPro] = useState<boolean | null>(null);
+  const [paywallVisible, setPaywallVisible] = useState(false);
+
+  useEffect(() => {
+    canUseSOS().then(setIsPro);
+  }, []);
 
   const handleSelect = (id: SOSScenario) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -56,6 +64,37 @@ export default function SOSScreen() {
   };
 
   const plan = selected ? getSOSPlan(selected) : null;
+
+  // Still checking premium status
+  if (isPro === null) return <View style={styles.container} />;
+
+  // Not premium — show locked state with paywall
+  if (!isPro) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 32 }]}>
+        <Text style={{ fontSize: 56, marginBottom: 16 }}>🆘</Text>
+        <Text style={{ color: '#FFFFFF', fontSize: 24, fontWeight: '900', textAlign: 'center', marginBottom: 12 }}>
+          SOS Mode
+        </Text>
+        <Text style={{ color: '#666666', fontSize: 15, textAlign: 'center', lineHeight: 22, marginBottom: 32 }}>
+          Emergency relationship recovery plans. Step-by-step playbooks for when things go sideways.
+        </Text>
+        <TouchableOpacity
+          style={{ backgroundColor: '#F5C518', borderRadius: 16, paddingVertical: 16, paddingHorizontal: 32, width: '100%', alignItems: 'center' }}
+          onPress={() => setPaywallVisible(true)}
+          activeOpacity={0.85}
+        >
+          <Text style={{ color: '#0A0A0A', fontSize: 16, fontWeight: '900' }}>Unlock SOS Mode 🔓</Text>
+        </TouchableOpacity>
+        <PaywallModal
+          visible={paywallVisible}
+          reason="sos_mode"
+          onClose={() => setPaywallVisible(false)}
+          onPurchased={() => canUseSOS().then(setIsPro)}
+        />
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>

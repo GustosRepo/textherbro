@@ -29,7 +29,8 @@ export type AnalyticsEvent =
   | 'sos_scenario_selected'
   | 'milestone_added'
   | 'partner_switched'
-  | 'partner_deleted';
+  | 'partner_deleted'
+  | 'onboarding_complete';
 
 export interface AnalyticsEntry {
   event: AnalyticsEvent;

@@ -8,7 +8,11 @@ import {
   ScrollView,
   Alert,
   Image,
+  Linking,
 } from 'react-native';
+
+const PRIVACY_URL = 'https://code-werx.com/textherbro-privacy';
+const TERMS_URL = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
 
 const MASCOT_THUMBSUP = require('../../assets/mascot/thumbsupmascot.png');
 import { PREMIUM_FEATURES, PRICING, PricingTier } from '../config/premiumFeatures';
@@ -115,6 +119,20 @@ export default function PaywallModal({
             <TouchableOpacity style={styles.restoreBtn} onPress={handleRestore}>
               <Text style={styles.restoreBtnText}>Restore Purchases</Text>
             </TouchableOpacity>
+
+            {/* Legal */}
+            <Text style={styles.renewalNote}>
+              Subscription auto-renews unless cancelled at least 24 hours before the end of the current period. Manage or cancel in App Store settings.
+            </Text>
+            <View style={styles.legalRow}>
+              <TouchableOpacity onPress={() => Linking.openURL(PRIVACY_URL)}>
+                <Text style={styles.legalLink}>Privacy Policy</Text>
+              </TouchableOpacity>
+              <Text style={styles.legalSep}> · </Text>
+              <TouchableOpacity onPress={() => Linking.openURL(TERMS_URL)}>
+                <Text style={styles.legalLink}>Terms of Service</Text>
+              </TouchableOpacity>
+            </View>
           </ScrollView>
         </View>
       </View>
@@ -257,5 +275,29 @@ const styles = StyleSheet.create({
     color: '#666666',
     fontSize: 13,
     fontWeight: '600',
+  },
+  renewalNote: {
+    color: '#444444',
+    fontSize: 11,
+    textAlign: 'center',
+    lineHeight: 16,
+    marginTop: 4,
+    marginBottom: 12,
+    paddingHorizontal: 8,
+  },
+  legalRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  legalLink: {
+    color: '#555555',
+    fontSize: 12,
+    textDecorationLine: 'underline',
+  },
+  legalSep: {
+    color: '#444444',
+    fontSize: 12,
   },
 });
