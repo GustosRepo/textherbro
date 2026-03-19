@@ -12,7 +12,7 @@
       "backgroundColor": "#0A0A0A"
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.codewerx.TextHerBro",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
