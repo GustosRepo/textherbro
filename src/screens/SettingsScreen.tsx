@@ -15,6 +15,12 @@ const PRIVACY_URL = 'https://code-werx.com/textherbro-privacy';
 const TERMS_URL = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
 const SUPPORT_EMAIL = 'mailto:support@textherbro.com';
 
+const openSupport = () => {
+  Linking.openURL(SUPPORT_EMAIL).catch(() =>
+    Linking.openURL('https://code-werx.com/textherbro-privacy')
+  );
+};
+
 const MASCOT_REFLECTING = require('../../assets/mascot/relfectingmascot.png');
 import { useFocusEffect } from '@react-navigation/native';
 import { getSettings, saveSettings, getPartner } from '../services/storage';
@@ -206,7 +212,7 @@ export default function SettingsScreen({ navigation }: any) {
 
       <TouchableOpacity
         style={styles.settingRow}
-        onPress={() => Linking.openURL(SUPPORT_EMAIL)}
+        onPress={openSupport}
       >
         <Text style={styles.settingLabel}>Contact Support</Text>
         <Text style={styles.chevron}>›</Text>
