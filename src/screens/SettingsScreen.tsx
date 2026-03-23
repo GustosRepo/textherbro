@@ -206,7 +206,7 @@ export default function SettingsScreen({ navigation }: any) {
         style={styles.settingRow}
         onPress={() => Linking.openURL(TERMS_URL)}
       >
-        <Text style={styles.settingLabel}>Terms of Service</Text>
+        <Text style={styles.settingLabel}>Terms of Use (EULA)</Text>
         <Text style={styles.chevron}>›</Text>
       </TouchableOpacity>
 

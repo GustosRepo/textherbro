@@ -88,10 +88,16 @@ export async function purchasePremium(tier: PricingTier): Promise<PurchaseResult
   try {
     const Purchases = (await import('react-native-purchases')).default;
     const offerings = await Purchases.getOfferings();
-    const pkg = offerings.current?.availablePackages.find(
+    if (!offerings.current) {
+      console.warn('[Paywall] No current offering configured in RevenueCat');
+      return { success: false, message: 'Subscriptions not available. Please try again later.' };
+    }
+    const pkg = offerings.current.availablePackages.find(
       (p) => p.product.identifier === productId,
     );
     if (!pkg) {
+      console.warn(`[Paywall] Product ${productId} not found in offering. Available:`,
+        offerings.current.availablePackages.map(p => p.product.identifier));
       return { success: false, message: 'Product not found. Try again later.' };
     }
     const { customerInfo } = await Purchases.purchasePackage(pkg);
@@ -104,6 +110,7 @@ export async function purchasePremium(tier: PricingTier): Promise<PurchaseResult
     return { success: false, message: 'Purchase incomplete. Please try again.' };
   } catch (e: any) {
     if (e?.userCancelled) return { success: false, message: 'Purchase cancelled.' };
+    console.warn('[Paywall] Purchase error:', e?.message ?? e);
     return { success: false, message: 'Purchase failed. Please try again.' };
   }
 }

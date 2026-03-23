@@ -46,7 +46,8 @@
             "NSUserNotificationsUsageDescription": "TextHerBro sends daily reminders to help you stay consistent with your partner."
           }
         }
-      ]
+      ],
+      "react-native-purchases"
     ],
     "extra": {
       "eas": {

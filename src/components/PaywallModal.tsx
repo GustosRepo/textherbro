@@ -102,17 +102,18 @@ export default function PaywallModal({
               style={[styles.priceBtn, styles.priceBtnHighlight]}
               onPress={() => handlePurchase('annual')}
             >
-              <Text style={styles.priceBtnLabel}>Annual</Text>
-              <Text style={styles.priceAmt}>{PRICING.annual.price}/yr</Text>
-              <Text style={styles.priceNote}>Save {PRICING.annual.savings}</Text>
+              <Text style={styles.priceBtnLabel}>TextHerBro Premium — Annual</Text>
+              <Text style={styles.priceAmt}>{PRICING.annual.price}/year</Text>
+              <Text style={styles.priceNote}>{`${PRICING.annual.price} per 12 months · Save ${PRICING.annual.savings}`}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.priceBtn}
               onPress={() => handlePurchase('monthly')}
             >
-              <Text style={styles.priceBtnLabel}>Monthly</Text>
-              <Text style={styles.priceAmt}>{PRICING.monthly.price}/mo</Text>
+              <Text style={styles.priceBtnLabel}>TextHerBro Premium — Monthly</Text>
+              <Text style={styles.priceAmt}>{PRICING.monthly.price}/month</Text>
+              <Text style={styles.priceNote}>{`${PRICING.monthly.price} per 1 month`}</Text>
             </TouchableOpacity>
 
             {/* Restore */}
@@ -122,7 +123,7 @@ export default function PaywallModal({
 
             {/* Legal */}
             <Text style={styles.renewalNote}>
-              Subscription auto-renews unless cancelled at least 24 hours before the end of the current period. Manage or cancel in App Store settings.
+              Payment will be charged to your Apple ID account at confirmation of purchase. Subscription automatically renews unless it is canceled at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period. You can manage and cancel your subscriptions by going to your App Store account settings after purchase.
             </Text>
             <View style={styles.legalRow}>
               <TouchableOpacity onPress={() => Linking.openURL(PRIVACY_URL)}>
@@ -130,7 +131,7 @@ export default function PaywallModal({
               </TouchableOpacity>
               <Text style={styles.legalSep}> · </Text>
               <TouchableOpacity onPress={() => Linking.openURL(TERMS_URL)}>
-                <Text style={styles.legalLink}>Terms of Service</Text>
+                <Text style={styles.legalLink}>Terms of Use (EULA)</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
