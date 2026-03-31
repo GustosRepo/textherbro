@@ -15,12 +15,24 @@ import { PRICING, PricingTier } from '../config/premiumFeatures';
 import { isPremium, setPremiumStatus } from './premium';
 import { trackEvent } from './analytics';
 
+// ─── RevenueCat — safe import (native module unavailable in Expo Go) ────────
+
+let Purchases: any = null;
+let PURCHASES_ERROR_CODE: any = {};
+try {
+  const mod = require('react-native-purchases');
+  Purchases = mod.default;
+  PURCHASES_ERROR_CODE = mod.PURCHASES_ERROR_CODE ?? {};
+} catch {
+  console.log('[Paywall] react-native-purchases not available — running in mock mode');
+}
+
 // ─── RevenueCat Configuration ───────────────────────────────────────────────
 
 // ⚠️  Replace with your key from https://app.revenuecat.com → Project → API Keys
 export const REVENUECAT_API_KEY: string = 'appl_HESqzhchdJRpLJGPGwMREFOFfjg';
 
-const IS_CONFIGURED = REVENUECAT_API_KEY !== '__YOUR_REVENUECAT_API_KEY__';
+const IS_CONFIGURED = Purchases !== null && REVENUECAT_API_KEY !== '__YOUR_REVENUECAT_API_KEY__';
 
 // ─── Paywall Reason ─────────────────────────────────────────────────────────
 
@@ -44,7 +56,6 @@ export async function initializeRevenueCat(): Promise<void> {
     return;
   }
   try {
-    const Purchases = (await import('react-native-purchases')).default;
     await Purchases.configure({ apiKey: REVENUECAT_API_KEY });
     console.log('[Paywall] RevenueCat initialized');
   } catch (e) {
@@ -57,7 +68,6 @@ export async function initializeRevenueCat(): Promise<void> {
 export async function checkSubscriptionStatus(): Promise<boolean> {
   if (!IS_CONFIGURED) return isPremium();
   try {
-    const Purchases = (await import('react-native-purchases')).default;
     const customerInfo = await Purchases.getCustomerInfo();
     const active = customerInfo.entitlements.active['premium'] !== undefined;
     await setPremiumStatus(active);
@@ -86,18 +96,17 @@ export async function purchasePremium(tier: PricingTier): Promise<PurchaseResult
   }
 
   try {
-    const Purchases = (await import('react-native-purchases')).default;
     const offerings = await Purchases.getOfferings();
     if (!offerings.current) {
       console.warn('[Paywall] No current offering configured in RevenueCat');
       return { success: false, message: 'Subscriptions not available. Please try again later.' };
     }
     const pkg = offerings.current.availablePackages.find(
-      (p) => p.product.identifier === productId,
+      (p: any) => p.product.identifier === productId,
     );
     if (!pkg) {
       console.warn(`[Paywall] Product ${productId} not found in offering. Available:`,
-        offerings.current.availablePackages.map(p => p.product.identifier));
+        offerings.current.availablePackages.map((p: any) => p.product.identifier));
       return { success: false, message: 'Product not found. Try again later.' };
     }
     const { customerInfo } = await Purchases.purchasePackage(pkg);
@@ -109,8 +118,16 @@ export async function purchasePremium(tier: PricingTier): Promise<PurchaseResult
     }
     return { success: false, message: 'Purchase incomplete. Please try again.' };
   } catch (e: any) {
-    if (e?.userCancelled) return { success: false, message: 'Purchase cancelled.' };
-    console.warn('[Paywall] Purchase error:', e?.message ?? e);
+    if (e?.code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR) {
+      return { success: false, message: 'Purchase cancelled.' };
+    }
+    if (e?.code === PURCHASES_ERROR_CODE.PRODUCT_NOT_AVAILABLE_FOR_PURCHASE_ERROR) {
+      return { success: false, message: 'This product is not available for purchase right now.' };
+    }
+    if (e?.code === PURCHASES_ERROR_CODE.NETWORK_ERROR) {
+      return { success: false, message: 'Network error. Check your connection and try again.' };
+    }
+    console.warn('[Paywall] Purchase error:', e?.code, e?.message ?? e);
     return { success: false, message: 'Purchase failed. Please try again.' };
   }
 }
@@ -124,7 +141,6 @@ export async function restorePurchases(): Promise<PurchaseResult> {
     return { success: false, message: 'No previous purchases found.' };
   }
   try {
-    const Purchases = (await import('react-native-purchases')).default;
     const customerInfo = await Purchases.restorePurchases();
     const active = customerInfo.entitlements.active['premium'] !== undefined;
     if (active) {

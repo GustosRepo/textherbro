@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Alert,
   Image,
   Linking,
+  ActivityIndicator,
 } from 'react-native';
 
 const PRIVACY_URL = 'https://code-werx.com/textherbro-privacy';
@@ -38,21 +39,31 @@ export default function PaywallModal({
   onPurchased,
 }: PaywallModalProps) {
   const copy = getPaywallCopy(reason);
+  const [selectedTier, setSelectedTier] = useState<PricingTier>('annual');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (visible) {
       trackEvent('paywall_shown', { reason });
+      setSelectedTier('annual');
+      setLoading(false);
     }
   }, [visible, reason]);
 
-  const handlePurchase = async (tier: PricingTier) => {
-    const result = await purchasePremium(tier);
-    if (result.success) {
-      Alert.alert('Welcome, King 👑', result.message);
-      onPurchased();
-      onClose();
-    } else {
-      Alert.alert('Error', result.message);
+  const handlePurchase = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const result = await purchasePremium(selectedTier);
+      if (result.success) {
+        Alert.alert('Welcome, King 👑', result.message);
+        onPurchased();
+        onClose();
+      } else {
+        Alert.alert('Error', result.message);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -97,23 +108,42 @@ export default function PaywallModal({
               ))}
             </View>
 
-            {/* Pricing — Annual highlighted as best deal */}
+            {/* Pricing — tap to select, then subscribe */}
             <TouchableOpacity
-              style={[styles.priceBtn, styles.priceBtnHighlight]}
-              onPress={() => handlePurchase('annual')}
+              style={[styles.priceBtn, selectedTier === 'annual' && styles.priceBtnSelected]}
+              onPress={() => setSelectedTier('annual')}
+              disabled={loading}
             >
+              {selectedTier === 'annual' && <Text style={styles.bestValue}>BEST VALUE</Text>}
               <Text style={styles.priceBtnLabel}>TextHerBro Premium — Annual</Text>
               <Text style={styles.priceAmt}>{PRICING.annual.price}/year</Text>
               <Text style={styles.priceNote}>{`${PRICING.annual.price} per 12 months · Save ${PRICING.annual.savings}`}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.priceBtn}
-              onPress={() => handlePurchase('monthly')}
+              style={[styles.priceBtn, selectedTier === 'monthly' && styles.priceBtnSelected]}
+              onPress={() => setSelectedTier('monthly')}
+              disabled={loading}
             >
               <Text style={styles.priceBtnLabel}>TextHerBro Premium — Monthly</Text>
               <Text style={styles.priceAmt}>{PRICING.monthly.price}/month</Text>
               <Text style={styles.priceNote}>{`${PRICING.monthly.price} per 1 month`}</Text>
+            </TouchableOpacity>
+
+            {/* Subscribe button */}
+            <TouchableOpacity
+              style={[styles.subscribeBtn, loading && styles.subscribeBtnDisabled]}
+              onPress={handlePurchase}
+              disabled={loading}
+              activeOpacity={0.8}
+            >
+              {loading ? (
+                <ActivityIndicator color="#0A0A0A" />
+              ) : (
+                <Text style={styles.subscribeBtnText}>
+                  Subscribe — {selectedTier === 'annual' ? PRICING.annual.price + '/yr' : PRICING.monthly.price + '/mo'}
+                </Text>
+              )}
             </TouchableOpacity>
 
             {/* Restore */}
@@ -245,12 +275,19 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 10,
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#2A2A2A',
   },
-  priceBtnHighlight: {
+  priceBtnSelected: {
     borderColor: '#F5C518',
     backgroundColor: '#F5C51810',
+  },
+  bestValue: {
+    color: '#F5C518',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 2,
+    marginBottom: 6,
   },
   priceBtnLabel: {
     color: '#FFFFFF',
@@ -267,6 +304,22 @@ const styles = StyleSheet.create({
     color: '#999999',
     fontSize: 12,
     marginTop: 2,
+  },
+  subscribeBtn: {
+    backgroundColor: '#F5C518',
+    borderRadius: 14,
+    paddingVertical: 18,
+    alignItems: 'center',
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  subscribeBtnDisabled: {
+    opacity: 0.6,
+  },
+  subscribeBtnText: {
+    color: '#0A0A0A',
+    fontSize: 18,
+    fontWeight: '900',
   },
   restoreBtn: {
     alignItems: 'center',

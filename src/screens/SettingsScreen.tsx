@@ -166,15 +166,29 @@ export default function SettingsScreen({ navigation }: any) {
 
       {/* Premium */}
       {isPremiumUser ? (
-        <View style={[styles.settingRow, styles.premiumRow]}>
-          <View>
-            <Text style={styles.premiumLabel}>Premium Active 👑</Text>
-            <Text style={styles.settingDescription}>
-              All features unlocked
-            </Text>
+        <>
+          <View style={[styles.settingRow, styles.premiumRow]}>
+            <View>
+              <Text style={styles.premiumLabel}>Premium Active 👑</Text>
+              <Text style={styles.settingDescription}>
+                All features unlocked
+              </Text>
+            </View>
+            <Text style={styles.premiumBadge}>PRO</Text>
           </View>
-          <Text style={styles.premiumBadge}>PRO</Text>
-        </View>
+          <TouchableOpacity
+            style={styles.settingRow}
+            onPress={() => Linking.openURL('https://apps.apple.com/account/subscriptions')}
+          >
+            <View>
+              <Text style={styles.settingLabel}>Manage Subscription</Text>
+              <Text style={styles.settingDescription}>
+                Change plan, cancel, or view billing
+              </Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+        </>
       ) : (
         <TouchableOpacity
           style={[styles.settingRow, styles.upgradeRow]}

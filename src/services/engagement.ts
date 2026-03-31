@@ -12,7 +12,13 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as StoreReview from 'expo-store-review';
+
+let StoreReview: typeof import('expo-store-review') | null = null;
+try {
+  StoreReview = require('expo-store-review');
+} catch {
+  // Not available in Expo Go — review prompts will no-op
+}
 
 const KEYS = {
   LAST_REVIEW_PROMPT: '@textherbro_last_review_prompt',
@@ -29,6 +35,7 @@ const MIN_DAYS_BETWEEN_REVIEWS = 60; // be conservative
  */
 export async function maybeRequestReview(): Promise<void> {
   try {
+    if (!StoreReview) return;
     const isAvailable = await StoreReview.isAvailableAsync();
     if (!isAvailable) return;
 
@@ -38,7 +45,7 @@ export async function maybeRequestReview(): Promise<void> {
       if (daysSinceLast < MIN_DAYS_BETWEEN_REVIEWS) return;
     }
 
-    await StoreReview.requestReview();
+    await StoreReview!.requestReview();
     await AsyncStorage.setItem(KEYS.LAST_REVIEW_PROMPT, Date.now().toString());
   } catch {
     // Silently ignore — review prompts must never crash the app
