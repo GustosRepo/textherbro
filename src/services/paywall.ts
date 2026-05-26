@@ -11,6 +11,7 @@
  *   3. Run pod install after adding react-native-purchases
  */
 
+import Constants from 'expo-constants';
 import { PRICING, PricingTier } from '../config/premiumFeatures';
 import { isPremium, setPremiumStatus } from './premium';
 import { trackEvent } from './analytics';
@@ -29,10 +30,10 @@ try {
 
 // ─── RevenueCat Configuration ───────────────────────────────────────────────
 
-// ⚠️  Replace with your key from https://app.revenuecat.com → Project → API Keys
-export const REVENUECAT_API_KEY: string = 'appl_HESqzhchdJRpLJGPGwMREFOFfjg';
+export const REVENUECAT_API_KEY: string =
+  Constants.expoConfig?.extra?.revenueCatApiKey ?? '';
 
-const IS_CONFIGURED = Purchases !== null && REVENUECAT_API_KEY !== '__YOUR_REVENUECAT_API_KEY__';
+const IS_CONFIGURED = Purchases !== null && REVENUECAT_API_KEY !== '';
 
 // ─── Paywall Reason ─────────────────────────────────────────────────────────
 
