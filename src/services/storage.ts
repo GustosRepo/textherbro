@@ -27,7 +27,11 @@ const KEYS = {
   // Per-partner keys (formerly global — migrated on first access)
   SAVED_LINES: '@textherbro_saved_lines',
   MILESTONES: '@textherbro_milestones',
+  STORAGE_SCHEMA_VERSION: '@textherbro_storage_schema_version',
+  RECOVERY_PREFIX: '@textherbro_recovery',
 };
+
+const STORAGE_SCHEMA_VERSION = '1';
 
 /** Generate a simple unique ID */
 function genId(): string {
@@ -39,11 +43,120 @@ function pk(base: string, partnerId: string): string {
   return `${base}_${partnerId}`;
 }
 
+function recoveryKey(key: string): string {
+  return `${KEYS.RECOVERY_PREFIX}_${key.replace(/[^a-zA-Z0-9_@-]/g, '_')}_${Date.now()}`;
+}
+
+async function backupCorruptValue(key: string, raw: string): Promise<void> {
+  try {
+    await AsyncStorage.setItem(recoveryKey(key), raw);
+  } catch {
+    // Recovery copies are best-effort only.
+  }
+}
+
+async function parseStoredJSON<T>(
+  key: string,
+  raw: string | null,
+  fallback: T,
+  normalize?: (parsed: T) => T,
+): Promise<T> {
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw) as T;
+    return normalize ? normalize(parsed) : parsed;
+  } catch {
+    await backupCorruptValue(key, raw);
+    return fallback;
+  }
+}
+
+export async function ensureStorageSchema(): Promise<void> {
+  const currentVersion = await AsyncStorage.getItem(KEYS.STORAGE_SCHEMA_VERSION);
+  if (currentVersion === STORAGE_SCHEMA_VERSION) return;
+
+  const allPartners = await getAllPartners();
+  let activePartnerId = await getActivePartnerId();
+
+  if (allPartners.length === 0) {
+    const legacyPartner = await parseStoredJSON<Partial<Partner> | null>(
+      KEYS.PARTNER,
+      await AsyncStorage.getItem(KEYS.PARTNER),
+      null,
+    );
+
+    if (legacyPartner?.name) {
+      const migratedPartner: Partner = {
+        id: legacyPartner.id ?? genId(),
+        name: legacyPartner.name,
+        nickname: legacyPartner.nickname,
+        birthday: legacyPartner.birthday ?? '',
+        anniversary: legacyPartner.anniversary ?? '',
+        favorites: legacyPartner.favorites ?? {},
+        favoriteThings: legacyPartner.favoriteThings,
+      };
+
+      await saveAllPartners([migratedPartner]);
+      await setActivePartnerId(migratedPartner.id);
+      activePartnerId = migratedPartner.id;
+
+      const legacyEntries = await Promise.all([
+        AsyncStorage.getItem(KEYS.ACTIVITY_LOG),
+        AsyncStorage.getItem(KEYS.NOTES),
+        AsyncStorage.getItem(KEYS.HISTORY),
+      ]);
+      const partnerKeys = [
+        pk(KEYS.ACTIVITY_LOG, migratedPartner.id),
+        pk(KEYS.NOTES, migratedPartner.id),
+        pk(KEYS.HISTORY, migratedPartner.id),
+      ];
+
+      await Promise.all(
+        legacyEntries.map(async (value, index) => {
+          if (!value) return;
+          const targetKey = partnerKeys[index];
+          const existing = await AsyncStorage.getItem(targetKey);
+          if (!existing) {
+            await AsyncStorage.setItem(targetKey, value);
+          }
+        }),
+      );
+    }
+  }
+
+  if (!activePartnerId) {
+    const partners = await getAllPartners();
+    activePartnerId = partners[0]?.id ?? null;
+    if (activePartnerId) {
+      await setActivePartnerId(activePartnerId);
+    }
+  }
+
+  if (activePartnerId) {
+    const scopedSavedLinesKey = pk(KEYS.SAVED_LINES, activePartnerId);
+    const scopedMilestonesKey = pk(KEYS.MILESTONES, activePartnerId);
+    const [legacySavedLines, scopedSavedLines, legacyMilestones, scopedMilestones] = await Promise.all([
+      AsyncStorage.getItem(KEYS.SAVED_LINES),
+      AsyncStorage.getItem(scopedSavedLinesKey),
+      AsyncStorage.getItem(KEYS.MILESTONES),
+      AsyncStorage.getItem(scopedMilestonesKey),
+    ]);
+
+    if (legacySavedLines && !scopedSavedLines) {
+      await AsyncStorage.setItem(scopedSavedLinesKey, legacySavedLines);
+    }
+    if (legacyMilestones && !scopedMilestones) {
+      await AsyncStorage.setItem(scopedMilestonesKey, legacyMilestones);
+    }
+  }
+
+  await AsyncStorage.setItem(KEYS.STORAGE_SCHEMA_VERSION, STORAGE_SCHEMA_VERSION);
+}
+
 // ─── Multi-Partner Management ────────────────────────────────────────────────
 
 export async function getAllPartners(): Promise<Partner[]> {
-  const raw = await AsyncStorage.getItem(KEYS.ALL_PARTNERS);
-  return raw ? JSON.parse(raw) : [];
+  return parseStoredJSON(KEYS.ALL_PARTNERS, await AsyncStorage.getItem(KEYS.ALL_PARTNERS), []);
 }
 
 export async function saveAllPartners(partners: Partner[]): Promise<void> {
@@ -93,7 +206,8 @@ export async function getPartner(): Promise<Partner | null> {
   if (partners.length === 0) {
     const raw = await AsyncStorage.getItem(KEYS.PARTNER);
     if (!raw) return null;
-    const parsed = JSON.parse(raw);
+    const parsed = await parseStoredJSON<any | null>(KEYS.PARTNER, raw, null);
+    if (!parsed) return null;
     if (!parsed.favorites) parsed.favorites = {};
     if (!parsed.id) parsed.id = genId();
     await saveAllPartners([parsed]);
@@ -137,8 +251,10 @@ async function activePartnerKey(base: string): Promise<string> {
 
 export async function getActivityLog(): Promise<ActivityLog> {
   const key = await activePartnerKey(KEYS.ACTIVITY_LOG);
-  const raw = await AsyncStorage.getItem(key);
-  return raw ? (JSON.parse(raw) as ActivityLog) : { ...DEFAULT_ACTIVITY_LOG };
+  return parseStoredJSON(key, await AsyncStorage.getItem(key), { ...DEFAULT_ACTIVITY_LOG }, (parsed: Partial<ActivityLog>) => ({
+    ...DEFAULT_ACTIVITY_LOG,
+    ...parsed,
+  }));
 }
 
 export async function saveActivityLog(log: ActivityLog): Promise<void> {
@@ -217,10 +333,9 @@ export async function logActivity(
 
 export async function getNoteEntries(): Promise<NoteEntry[]> {
   const key = await activePartnerKey(KEYS.NOTES);
-  const raw = await AsyncStorage.getItem(key);
-  if (!raw) return [];
-  const parsed = JSON.parse(raw) as NoteEntry[];
-  return parsed.map((n) => ({ ...n, category: n.category ?? 'general' }));
+  return parseStoredJSON(key, await AsyncStorage.getItem(key), [], (parsed: NoteEntry[]) =>
+    parsed.map((n) => ({ ...n, category: n.category ?? 'general' })),
+  );
 }
 
 export async function saveNoteEntries(notes: NoteEntry[]): Promise<void> {
@@ -255,8 +370,7 @@ export async function deleteNoteEntry(id: string): Promise<NoteEntry[]> {
 
 export async function getHistory(): Promise<ActivityHistoryEntry[]> {
   const key = await activePartnerKey(KEYS.HISTORY);
-  const raw = await AsyncStorage.getItem(key);
-  return raw ? (JSON.parse(raw) as ActivityHistoryEntry[]) : [];
+  return parseStoredJSON(key, await AsyncStorage.getItem(key), []);
 }
 
 async function addHistoryEntry(type: 'compliment' | 'checkIn' | 'date'): Promise<void> {
@@ -282,12 +396,11 @@ export async function getSavedLines(): Promise<SavedLine[]> {
     const globalRaw = await AsyncStorage.getItem(KEYS.SAVED_LINES);
     if (globalRaw) {
       await AsyncStorage.setItem(key, globalRaw);
-      await AsyncStorage.removeItem(KEYS.SAVED_LINES);
       raw = globalRaw;
     }
   }
 
-  return raw ? JSON.parse(raw) : [];
+  return parseStoredJSON(key, raw, []);
 }
 
 export async function saveLine(text: string, category: SavedLine['category']): Promise<SavedLine[]> {
@@ -331,12 +444,11 @@ export async function getMilestones(): Promise<Milestone[]> {
     const globalRaw = await AsyncStorage.getItem(KEYS.MILESTONES);
     if (globalRaw) {
       await AsyncStorage.setItem(key, globalRaw);
-      await AsyncStorage.removeItem(KEYS.MILESTONES);
       raw = globalRaw;
     }
   }
 
-  const all: Milestone[] = raw ? JSON.parse(raw) : [];
+  const all = await parseStoredJSON(key, raw, [] as Milestone[]);
   return all.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
 
@@ -360,11 +472,10 @@ export async function deleteMilestone(id: string): Promise<Milestone[]> {
 // ─── Settings ───────────────────────────────────────────────────────────────
 
 export async function getSettings(): Promise<AppSettings> {
-  const raw = await AsyncStorage.getItem(KEYS.SETTINGS);
-  if (!raw) return { ...DEFAULT_SETTINGS };
-  const parsed = JSON.parse(raw) as Partial<AppSettings>;
-  // Migration: fill in any missing fields with defaults
-  return { ...DEFAULT_SETTINGS, ...parsed };
+  return parseStoredJSON(KEYS.SETTINGS, await AsyncStorage.getItem(KEYS.SETTINGS), { ...DEFAULT_SETTINGS }, (parsed: Partial<AppSettings>) => ({
+    ...DEFAULT_SETTINGS,
+    ...parsed,
+  }));
 }
 
 export async function saveSettings(settings: AppSettings): Promise<void> {

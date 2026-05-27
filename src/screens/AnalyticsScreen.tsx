@@ -18,11 +18,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import { getHistory, getActivityLog } from '../services/storage';
 import { getScoreHistory, getScoreTrend, ScoreTrend, ScoreSnapshot } from '../services/scoreHistory';
 import { getAnalyticsSummary, AnalyticsSummary } from '../services/analytics';
-import { isPremium } from '../services/premium';
 import { ActivityLog, ActivityHistoryEntry } from '../types/partner';
 import { daysAgoLabel } from '../utils/date';
 import PaywallModal from '../components/PaywallModal';
-import { PaywallReason } from '../services/paywall';
+import { PaywallReason, checkSubscriptionStatus } from '../services/paywall';
 
 const MASCOT_REFLECTING = require('../../assets/mascot/relfectingmascot.png');
 
@@ -53,24 +52,28 @@ export default function AnalyticsScreen() {
   const [paywallVisible, setPaywallVisible] = useState(false);
 
   const loadData = useCallback(async () => {
-    const premium = await isPremium();
-    setIsPro(premium);
+    try {
+      const premium = await checkSubscriptionStatus();
+      setIsPro(premium);
 
-    if (!premium) return;
+      if (!premium) return;
 
-    const [activityLog, hist, scoreTrend, analyticsSummary, scoreHist] = await Promise.all([
-      getActivityLog(),
-      getHistory(),
-      getScoreTrend(),
-      getAnalyticsSummary(),
-      getScoreHistory(),
-    ]);
+      const [activityLog, hist, scoreTrend, analyticsSummary, scoreHist] = await Promise.all([
+        getActivityLog(),
+        getHistory(),
+        getScoreTrend(),
+        getAnalyticsSummary(),
+        getScoreHistory(),
+      ]);
 
-    setLog(activityLog);
-    setHistory(hist);
-    setTrend(scoreTrend);
-    setSummary(analyticsSummary);
-    setScoreHistory(scoreHist);
+      setLog(activityLog);
+      setHistory(hist);
+      setTrend(scoreTrend);
+      setSummary(analyticsSummary);
+      setScoreHistory(scoreHist);
+    } catch (e) {
+      console.warn('[AnalyticsScreen] loadData error:', e);
+    }
   }, []);
 
   useFocusEffect(
@@ -114,8 +117,9 @@ export default function AnalyticsScreen() {
   const bestStreak = log ? Math.max(log.complimentStreak, log.checkInStreak, log.dateStreak) : 0;
 
   // Fumble count: days with no activity in history range
-  const uniqueActiveDays = new Set(history.map(h => h.timestamp.slice(0, 10))).size;
-  const oldestEntry = history.length > 0 ? history[history.length - 1].timestamp : null;
+  const safeHistory = history.filter((h) => typeof h.timestamp === 'string' && !Number.isNaN(new Date(h.timestamp).getTime()));
+  const uniqueActiveDays = new Set(safeHistory.map(h => h.timestamp.slice(0, 10))).size;
+  const oldestEntry = safeHistory.length > 0 ? safeHistory[safeHistory.length - 1].timestamp : null;
   const daysSinceStart = oldestEntry
     ? Math.ceil((Date.now() - new Date(oldestEntry).getTime()) / (1000 * 60 * 60 * 24))
     : 0;
@@ -123,7 +127,7 @@ export default function AnalyticsScreen() {
 
   // Weekly report: last 7 days
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const thisWeekHistory = history.filter(h => new Date(h.timestamp).getTime() >= sevenDaysAgo);
+  const thisWeekHistory = safeHistory.filter(h => new Date(h.timestamp).getTime() >= sevenDaysAgo);
   const weekCompliments = thisWeekHistory.filter(h => h.type === 'compliment').length;
   const weekCheckIns = thisWeekHistory.filter(h => h.type === 'checkIn').length;
   const weekDates = thisWeekHistory.filter(h => h.type === 'date').length;

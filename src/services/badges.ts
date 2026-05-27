@@ -9,6 +9,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityLog, ActivityHistoryEntry } from '../types/partner';
 
 const KEY = '@textherbro_badges';
+const RECOVERY_PREFIX = '@textherbro_recovery';
+
+function recoveryKey(): string {
+  return `${RECOVERY_PREFIX}_${KEY.replace(/[^a-zA-Z0-9_@-]/g, '_')}_${Date.now()}`;
+}
+
+async function backupCorruptValue(raw: string): Promise<void> {
+  try {
+    await AsyncStorage.setItem(recoveryKey(), raw);
+  } catch {
+    // Recovery copies are best-effort only.
+  }
+}
 
 // ─── Badge Definitions ──────────────────────────────────────────────────────
 
@@ -73,7 +86,13 @@ export interface AwardedBadge {
 
 export async function getAwardedBadges(): Promise<AwardedBadge[]> {
   const raw = await AsyncStorage.getItem(KEY);
-  return raw ? JSON.parse(raw) : [];
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw);
+  } catch {
+    await backupCorruptValue(raw);
+    return [];
+  }
 }
 
 async function saveBadges(badges: AwardedBadge[]): Promise<void> {
@@ -132,7 +151,8 @@ export async function checkAndAwardBadges(
   // We approximate with: at least 5 days where both compliment and checkIn happened
   const dayMap = new Map<string, Set<string>>();
   for (const h of history) {
-    const day = h.timestamp.slice(0, 10);
+    const day = h.timestamp?.slice(0, 10);
+    if (!day) continue;
     if (!dayMap.has(day)) dayMap.set(day, new Set());
     dayMap.get(day)!.add(h.type);
   }

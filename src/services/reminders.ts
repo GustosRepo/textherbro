@@ -1,34 +1,62 @@
-import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { getPartner, getActivityLog } from './storage';
 import { isSameDay, isWithinDays, daysSince } from '../utils/date';
 import { isPremium } from './premium';
 
 // ─── Setup ──────────────────────────────────────────────────────────────────
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+const IS_EXPO_GO = Constants.executionEnvironment === 'storeClient';
+
+let Notifications: typeof import('expo-notifications') | null = null;
+let notificationsInitialized = false;
+
+function getNotificationsModule(): typeof import('expo-notifications') | null {
+  if (Notifications) return Notifications;
+  if (IS_EXPO_GO) return null;
+  try {
+    Notifications = require('expo-notifications');
+    return Notifications;
+  } catch {
+    return null;
+  }
+}
+
+export function ensureNotificationsInitialized(): void {
+  if (notificationsInitialized) return;
+  const notifications = getNotificationsModule();
+  if (!notifications) return;
+  notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+  notificationsInitialized = true;
+}
 
 export async function registerForPushNotifications(): Promise<string | null> {
+  const notifications = getNotificationsModule();
+  if (!notifications) {
+    console.log('Push notifications are unavailable in Expo Go');
+    return null;
+  }
+
   if (!Device.isDevice) {
     console.log('Push notifications require a physical device');
     return null;
   }
 
   const { status: existingStatus } =
-    await Notifications.getPermissionsAsync();
+    await notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
 
   if (existingStatus !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
+    const { status } = await notifications.requestPermissionsAsync();
     finalStatus = status;
   }
 
@@ -37,9 +65,9 @@ export async function registerForPushNotifications(): Promise<string | null> {
   }
 
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
+    await notifications.setNotificationChannelAsync('default', {
       name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
+      importance: notifications.AndroidImportance.MAX,
     });
   }
 
@@ -97,8 +125,11 @@ function hoursSinceLastActivity(log: { lastCompliment: string | null; lastCheckI
 export async function scheduleReminders(
   options: { hour?: number; minute?: number } = {},
 ): Promise<void> {
+  const notifications = getNotificationsModule();
+  if (!notifications) return;
+
   // Cancel existing before re-scheduling
-  await Notifications.cancelAllScheduledNotificationsAsync();
+  await notifications.cancelAllScheduledNotificationsAsync();
 
   const log = await getActivityLog();
   const now = new Date().toISOString();
@@ -113,10 +144,10 @@ export async function scheduleReminders(
     if (hoursSince < 12) {
       const triggerMs = (12 - hoursSince) * 60 * 60 * 1000;
       if (triggerMs > 0) {
-        await Notifications.scheduleNotificationAsync({
+        await notifications.scheduleNotificationAsync({
           content: { title: 'Text Her Bro', body: randomMessage('fumbleWarning') },
           trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+            type: notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
             seconds: Math.max(60, Math.round(triggerMs / 1000)),
           },
         });
@@ -124,10 +155,10 @@ export async function scheduleReminders(
     } else if (hoursSince < 18) {
       const triggerMs = (18 - hoursSince) * 60 * 60 * 1000;
       if (triggerMs > 0) {
-        await Notifications.scheduleNotificationAsync({
+        await notifications.scheduleNotificationAsync({
           content: { title: '⚠️ Fumble Alert', body: randomMessage('fumbleWarning') },
           trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+            type: notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
             seconds: Math.max(60, Math.round(triggerMs / 1000)),
           },
         });
@@ -135,19 +166,19 @@ export async function scheduleReminders(
     } else if (hoursSince < 24) {
       const triggerMs = (24 - hoursSince) * 60 * 60 * 1000;
       if (triggerMs > 0) {
-        await Notifications.scheduleNotificationAsync({
+        await notifications.scheduleNotificationAsync({
           content: { title: '🚨 FUMBLE INCOMING', body: randomMessage('fumbleUrgent') },
           trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+            type: notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
             seconds: Math.max(60, Math.round(triggerMs / 1000)),
           },
         });
       }
     } else {
-      await Notifications.scheduleNotificationAsync({
+      await notifications.scheduleNotificationAsync({
         content: { title: '🚨 FUMBLE INCOMING', body: randomMessage('fumbleUrgent') },
         trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          type: notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
           seconds: 60,
         },
       });
@@ -157,10 +188,10 @@ export async function scheduleReminders(
   // ── Daily Check-in Reminder (PRO: only if not checked in today; FREE: always) ──
   const didCheckInToday = log.lastCheckIn && isSameDay(log.lastCheckIn, now);
   if (!didCheckInToday || !userIsPro) {
-    await Notifications.scheduleNotificationAsync({
+    await notifications.scheduleNotificationAsync({
       content: { title: 'Text Her Bro', body: randomMessage('checkIn') },
       trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        type: notifications.SchedulableTriggerInputTypes.DAILY,
         hour: reminderHour,
         minute: reminderMinute,
       },
@@ -172,10 +203,10 @@ export async function scheduleReminders(
     const needsCompliment = !log.lastCompliment || !isWithinDays(log.lastCompliment, 2);
     if (needsCompliment) {
       const complimentHour = reminderHour > 12 ? reminderHour - 6 : 12;
-      await Notifications.scheduleNotificationAsync({
+      await notifications.scheduleNotificationAsync({
         content: { title: 'Text Her Bro', body: randomMessage('compliment') },
         trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          type: notifications.SchedulableTriggerInputTypes.DAILY,
           hour: complimentHour,
           minute: reminderMinute,
         },
@@ -197,6 +228,8 @@ async function scheduleDateReminder(
   dateStr: string,
   type: 'birthday' | 'anniversary',
 ): Promise<void> {
+  const notifications = getNotificationsModule();
+  if (!notifications) return;
   if (!dateStr) return;
 
   const now = new Date();
@@ -213,18 +246,20 @@ async function scheduleDateReminder(
   const reminderDate = new Date(date.getTime() - 3 * 24 * 60 * 60 * 1000);
   if (reminderDate.getTime() <= now.getTime()) return;
 
-  await Notifications.scheduleNotificationAsync({
+  await notifications.scheduleNotificationAsync({
     content: {
       title: 'Text Her Bro',
       body: randomMessage(type),
     },
     trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      type: notifications.SchedulableTriggerInputTypes.DATE,
       date: reminderDate,
     },
   });
 }
 
 export async function cancelAllReminders(): Promise<void> {
-  await Notifications.cancelAllScheduledNotificationsAsync();
+  const notifications = getNotificationsModule();
+  if (!notifications) return;
+  await notifications.cancelAllScheduledNotificationsAsync();
 }

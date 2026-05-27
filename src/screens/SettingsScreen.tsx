@@ -29,8 +29,7 @@ import {
   scheduleReminders,
   cancelAllReminders,
 } from '../services/reminders';
-import { isPremium } from '../services/premium';
-import { PaywallReason } from '../services/paywall';
+import { PaywallReason, checkSubscriptionStatus } from '../services/paywall';
 import PaywallModal from '../components/PaywallModal';
 
 const REMINDER_TIMES = [
@@ -57,7 +56,7 @@ export default function SettingsScreen({ navigation }: any) {
         const [settings, partner, premium] = await Promise.all([
           getSettings(),
           getPartner(),
-          isPremium(),
+          checkSubscriptionStatus(),
         ]);
         setRemindersEnabled(settings.remindersEnabled);
         setReminderHour(settings.reminderHour ?? 18);

@@ -18,12 +18,18 @@ import { trackEvent } from './analytics';
 
 // ─── RevenueCat — safe import (native module unavailable in Expo Go) ────────
 
+const IS_EXPO_GO = Constants.executionEnvironment === 'storeClient';
+
 let Purchases: any = null;
 let PURCHASES_ERROR_CODE: any = {};
 try {
-  const mod = require('react-native-purchases');
-  Purchases = mod.default;
-  PURCHASES_ERROR_CODE = mod.PURCHASES_ERROR_CODE ?? {};
+  if (!IS_EXPO_GO) {
+    const mod = require('react-native-purchases');
+    Purchases = mod.default;
+    PURCHASES_ERROR_CODE = mod.PURCHASES_ERROR_CODE ?? {};
+  } else {
+    console.log('[Paywall] Expo Go detected — forcing mock mode for purchases');
+  }
 } catch {
   console.log('[Paywall] react-native-purchases not available — running in mock mode');
 }

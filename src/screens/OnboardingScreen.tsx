@@ -26,6 +26,7 @@ import * as Haptics from 'expo-haptics';
 import { addPartner } from '../services/storage';
 import { registerForPushNotifications, scheduleReminders } from '../services/reminders';
 import { trackEvent } from '../services/analytics';
+import { toYMD } from '../utils/date';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const TOTAL_STEPS = 4;
@@ -129,7 +130,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
       name: partnerName.trim() || 'Partner',
       nickname: '',
       birthday: '',
-      anniversary: anniversary ? anniversary.toISOString() : '',
+      anniversary: anniversary ? toYMD(anniversary) : '',
       favorites: {},
     });
 

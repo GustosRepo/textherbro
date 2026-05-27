@@ -80,6 +80,16 @@ export function daysUntilAnnual(isoDate: string | null): number | null {
 }
 
 /**
+ * Format a Date object as a YYYY-MM-DD string (local calendar date).
+ */
+export function toYMD(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/**
  * Validate a YYYY-MM-DD string. Returns true if it parses to a real date.
  */
 export function isValidDateString(str: string): boolean {

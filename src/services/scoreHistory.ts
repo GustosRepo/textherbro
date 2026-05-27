@@ -8,6 +8,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const KEY = '@textherbro_score_history';
+const RECOVERY_PREFIX = '@textherbro_recovery';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -23,9 +24,22 @@ function todayKey(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function recoveryKey(): string {
+  return `${RECOVERY_PREFIX}_${KEY.replace(/[^a-zA-Z0-9_@-]/g, '_')}_${Date.now()}`;
+}
+
+async function backupCorruptValue(raw: string): Promise<void> {
+  try {
+    await AsyncStorage.setItem(recoveryKey(), raw);
+  } catch {
+    // Recovery copies are best-effort only.
+  }
+}
+
 // ─── Record ─────────────────────────────────────────────────────────────────
 
 export async function recordDailyScore(score: number): Promise<void> {
+  if (!Number.isFinite(score)) return;
   const history = await getScoreHistory();
   const today = todayKey();
 
@@ -45,7 +59,13 @@ export async function recordDailyScore(score: number): Promise<void> {
 
 export async function getScoreHistory(): Promise<ScoreSnapshot[]> {
   const raw = await AsyncStorage.getItem(KEY);
-  return raw ? JSON.parse(raw) : [];
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw);
+  } catch {
+    await backupCorruptValue(raw);
+    return [];
+  }
 }
 
 // ─── Trend ──────────────────────────────────────────────────────────────────

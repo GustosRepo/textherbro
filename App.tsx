@@ -17,9 +17,9 @@ import SOSScreen from './src/screens/SOSScreen';
 import PlaybookScreen from './src/screens/PlaybookScreen';
 import MilestonesScreen from './src/screens/MilestonesScreen';
 
-import { registerForPushNotifications, scheduleReminders } from './src/services/reminders';
-import { getSettings } from './src/services/storage';
-import { initializeRevenueCat } from './src/services/paywall';
+import { ensureNotificationsInitialized, registerForPushNotifications, scheduleReminders } from './src/services/reminders';
+import { ensureStorageSchema, getSettings } from './src/services/storage';
+import { initializeRevenueCat, checkSubscriptionStatus } from './src/services/paywall';
 import { trackEvent } from './src/services/analytics';
 
 const Tab = createBottomTabNavigator();
@@ -83,7 +83,10 @@ export default function App() {
 
   useEffect(() => {
     (async () => {
+      await ensureStorageSchema();
+      ensureNotificationsInitialized();
       await initializeRevenueCat();
+      await checkSubscriptionStatus();
       await trackEvent('app_open');
 
       const done = await AsyncStorage.getItem(ONBOARDING_KEY);

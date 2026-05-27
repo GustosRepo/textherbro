@@ -45,7 +45,7 @@ import { ActivityLog, Partner, ActivityHistoryEntry, NoteEntry } from '../types/
 import { AwardedBadge, checkAndAwardBadges } from '../services/badges';
 import { recordDailyScore } from '../services/scoreHistory';
 import { trackEvent } from '../services/analytics';
-import { PaywallReason } from '../services/paywall';
+import { PaywallReason, checkSubscriptionStatus } from '../services/paywall';
 import { shouldShowStreakPaywall, markStreakPaywallShown, maybeRequestReview } from '../services/engagement';
 import type { PackId } from '../config/templatePacks';
 import { syncWidget } from '../services/widget';
@@ -99,6 +99,7 @@ export default function HomeScreen({ navigation }: any) {
   const [shieldCount, setShieldCount] = useState(0);
 
   const loadData = useCallback(async () => {
+    try {
     const [activityLog, partnerData, noteEntries, historyData, partners, activeId] = await Promise.all([
       getActivityLog(),
       getPartner(),
@@ -115,7 +116,7 @@ export default function HomeScreen({ navigation }: any) {
     setAllPartners(partners);
     setActivePartnerIdState(activeId);
 
-    const s = calculateScore(activityLog, notes.length);
+    const s = calculateScore(activityLog, noteEntries.length);
     setScore(s);
     setFumbles(getFumbleAlerts(activityLog));
     setFumbleRisk(calculateFumbleRisk(activityLog));
@@ -124,13 +125,12 @@ export default function HomeScreen({ navigation }: any) {
     const birthdayDays = partnerData ? daysUntilAnnual(partnerData.birthday) : null;
     const anniversaryDays = partnerData ? daysUntilAnnual(partnerData.anniversary) : null;
 
-    // Check premium status for template packs
+    // Check premium status — use live RevenueCat check to avoid stale cache
     const {
-      isPremium: checkPremium,
       getSelectedTone,
       getShieldCount,
     } = await import('../services/premium');
-    const userIsPro = await checkPremium();
+    const userIsPro = await checkSubscriptionStatus();
     const tone = await getSelectedTone();
     const shields = await getShieldCount();
     setIsPro(userIsPro);
@@ -177,6 +177,9 @@ export default function HomeScreen({ navigation }: any) {
       }
       items.sort((a, b) => a.daysLeft - b.daysLeft);
       setCountdowns(items);
+    }
+    } catch (e) {
+      console.warn('[HomeScreen] loadData error:', e);
     }
   }, []);
 
