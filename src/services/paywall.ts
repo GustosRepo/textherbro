@@ -12,6 +12,7 @@
  */
 
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import { PRICING, PricingTier } from '../config/premiumFeatures';
 import { isPremium, setPremiumStatus } from './premium';
 import { trackEvent } from './analytics';
@@ -36,8 +37,15 @@ try {
 
 // ─── RevenueCat Configuration ───────────────────────────────────────────────
 
+// RevenueCat requires platform-specific API keys
+const REVENUECAT_API_KEY_IOS: string =
+  Constants.expoConfig?.extra?.revenueCatApiKeyIOS ?? '';
+
+const REVENUECAT_API_KEY_ANDROID: string =
+  Constants.expoConfig?.extra?.revenueCatApiKeyAndroid ?? '';
+
 export const REVENUECAT_API_KEY: string =
-  Constants.expoConfig?.extra?.revenueCatApiKey ?? '';
+  Platform.OS === 'ios' ? REVENUECAT_API_KEY_IOS : REVENUECAT_API_KEY_ANDROID;
 
 const IS_CONFIGURED = Purchases !== null && REVENUECAT_API_KEY !== '';
 

@@ -20,6 +20,16 @@
       "ios": {
         "buildConfiguration": "Release"
       }
+    },
+    "production-android": {
+      "android": {
+        "buildType": "app-bundle"
+      }
+    },
+    "production-ios": {
+      "ios": {
+        "buildConfiguration": "Release"
+      }
     }
   },
   "submit": {
