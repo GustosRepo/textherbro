@@ -55,6 +55,32 @@ async function backupCorruptValue(key: string, raw: string): Promise<void> {
   }
 }
 
+/**
+ * iOS app containers are assigned a new UUID on every reinstall.
+ * Any absolute file:// path pointing into the old container becomes
+ * permanently broken. Strip those paths (set to null) at load time
+ * so callers never receive stale references they cannot recover.
+ *
+ * Relative paths, https:// URLs, or asset require() numbers are left untouched.
+ */
+const IOS_CONTAINER_FILE_RE =
+  /^file:\/\/\/(?:private\/)?var\/mobile\/Containers\/(?:Data|Bundle)\/Application\/[^/]+\//i;
+
+function stripStaleFileUris<T>(value: T): T {
+  if (typeof value === 'string') {
+    return (IOS_CONTAINER_FILE_RE.test(value) ? null : value) as unknown as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map(stripStaleFileUris) as unknown as T;
+  }
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, stripStaleFileUris(v)]),
+    ) as T;
+  }
+  return value;
+}
+
 async function parseStoredJSON<T>(
   key: string,
   raw: string | null,
@@ -63,7 +89,7 @@ async function parseStoredJSON<T>(
 ): Promise<T> {
   if (!raw) return fallback;
   try {
-    const parsed = JSON.parse(raw) as T;
+    const parsed = stripStaleFileUris(JSON.parse(raw) as T);
     return normalize ? normalize(parsed) : parsed;
   } catch {
     await backupCorruptValue(key, raw);

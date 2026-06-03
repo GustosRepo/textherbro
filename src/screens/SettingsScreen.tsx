@@ -7,9 +7,11 @@ import {
   TouchableOpacity,
   Alert,
   Image,
+  Modal,
   ScrollView,
   Linking,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 const PRIVACY_URL = 'https://code-werx.com/textherbro-privacy';
 const TERMS_URL = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
@@ -32,14 +34,11 @@ import {
 import { PaywallReason, checkSubscriptionStatus } from '../services/paywall';
 import PaywallModal from '../components/PaywallModal';
 
-const REMINDER_TIMES = [
-  { label: '7:00 AM', hour: 7, minute: 0 },
-  { label: '9:00 AM', hour: 9, minute: 0 },
-  { label: '12:00 PM', hour: 12, minute: 0 },
-  { label: '3:00 PM', hour: 15, minute: 0 },
-  { label: '6:00 PM', hour: 18, minute: 0 },
-  { label: '9:00 PM', hour: 21, minute: 0 },
-];
+function formatReminderTime(hour: number, minute: number): string {
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const h = hour % 12 || 12;
+  return `${h}:${String(minute).padStart(2, '0')} ${ampm}`;
+}
 
 export default function SettingsScreen({ navigation }: any) {
   const [remindersEnabled, setRemindersEnabled] = useState(true);
@@ -49,6 +48,7 @@ export default function SettingsScreen({ navigation }: any) {
   const [paywallReason, setPaywallReason] = useState<PaywallReason>('general');
   const [reminderHour, setReminderHour] = useState(18);
   const [reminderMinute, setReminderMinute] = useState(0);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -96,9 +96,14 @@ export default function SettingsScreen({ navigation }: any) {
     }
   };
 
-  const currentTimeLabel =
-    REMINDER_TIMES.find(t => t.hour === reminderHour && t.minute === reminderMinute)?.label ??
-    `${reminderHour}:${String(reminderMinute).padStart(2, '0')}`;
+  const currentTimeLabel = formatReminderTime(reminderHour, reminderMinute);
+
+  // Build a Date object whose hours/minutes match the stored reminder time
+  const reminderTimeAsDate = (() => {
+    const d = new Date();
+    d.setHours(reminderHour, reminderMinute, 0, 0);
+    return d;
+  })();
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -122,29 +127,61 @@ export default function SettingsScreen({ navigation }: any) {
 
       {/* PRO: Reminder time picker */}
       {isPremiumUser && remindersEnabled && (
-        <View style={styles.timePickerCard}>
-          <Text style={styles.timePickerLabel}>⏰ Reminder Time</Text>
-          <Text style={styles.timePickerSub}>
-            Smart fumble alerts trigger automatically. This sets your daily check-in time.
-          </Text>
-          <View style={styles.timeChips}>
-            {REMINDER_TIMES.map((t) => {
-              const isSelected = t.hour === reminderHour && t.minute === reminderMinute;
-              return (
-                <TouchableOpacity
-                  key={t.label}
-                  style={[styles.timeChip, isSelected && styles.timeChipSelected]}
-                  onPress={() => handleTimeSelect(t.hour, t.minute)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.timeChipText, isSelected && styles.timeChipTextSelected]}>
-                    {t.label}
-                  </Text>
+        <>
+          <TouchableOpacity
+            style={styles.timePickerCard}
+            onPress={() => setShowTimePicker(true)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.timePickerRow}>
+              <View>
+                <Text style={styles.timePickerLabel}>⏰ Reminder Time</Text>
+                <Text style={styles.timePickerSub}>
+                  Daily check-in nudge. Fumble alerts trigger automatically.
+                </Text>
+              </View>
+              <View style={styles.timePickerBadge}>
+                <Text style={styles.timePickerBadgeText}>{currentTimeLabel}</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+
+          <Modal
+            visible={showTimePicker}
+            transparent
+            animationType="slide"
+            onRequestClose={() => setShowTimePicker(false)}
+          >
+            <TouchableOpacity
+              style={styles.pickerOverlay}
+              activeOpacity={1}
+              onPress={() => setShowTimePicker(false)}
+            />
+            <View style={styles.pickerSheet}>
+              <View style={styles.pickerHeader}>
+                <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                  <Text style={styles.pickerCancelText}>Cancel</Text>
                 </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
+                <Text style={styles.pickerTitle}>Reminder Time</Text>
+                <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                  <Text style={styles.pickerDoneText}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={reminderTimeAsDate}
+                mode="time"
+                display="spinner"
+                textColor="#FFFFFF"
+                onChange={(_event, selected) => {
+                  if (selected) {
+                    handleTimeSelect(selected.getHours(), selected.getMinutes());
+                  }
+                }}
+                style={styles.picker}
+              />
+            </View>
+          </Modal>
+        </>
       )}
 
       {/* Edit partner */}
@@ -302,6 +339,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#F5C51830',
   },
+  timePickerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   timePickerLabel: {
     color: '#F5C518',
     fontSize: 14,
@@ -311,33 +353,58 @@ const styles = StyleSheet.create({
   timePickerSub: {
     color: '#666666',
     fontSize: 12,
-    marginBottom: 14,
     lineHeight: 17,
+    maxWidth: '80%',
   },
-  timeChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  timeChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#1E1E1E',
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
-  },
-  timeChipSelected: {
+  timePickerBadge: {
     backgroundColor: '#F5C51815',
+    borderWidth: 1,
     borderColor: '#F5C518',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
-  timeChipText: {
-    color: '#999999',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  timeChipTextSelected: {
+  timePickerBadgeText: {
     color: '#F5C518',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  // Time picker modal sheet
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  pickerSheet: {
+    backgroundColor: '#1A1A1A',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 34,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2A2A2A',
+  },
+  pickerTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  pickerCancelText: {
+    color: '#666666',
+    fontSize: 15,
+  },
+  pickerDoneText: {
+    color: '#F5C518',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  picker: {
+    height: 200,
   },
   // Premium rows
   premiumRow: {
