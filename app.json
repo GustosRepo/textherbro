@@ -27,7 +27,24 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.codewerx.TextHerBro"
+      "package": "com.codewerx.TextHerBro",
+      "versionCode": 2,
+      "permissions": [
+        "NOTIFICATIONS",
+        "SCHEDULE_EXACT_ALARM",
+        "USE_EXACT_ALARM"
+      ],
+      "blockedPermissions": [
+        "READ_CONTACTS",
+        "READ_CALENDAR",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "RECORD_AUDIO"
+      ],
+      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.codewerx.TextHerBro"
     },
     "web": {
       "favicon": "./assets/favicon.png"

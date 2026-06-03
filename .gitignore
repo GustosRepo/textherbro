@@ -8,7 +8,8 @@ node_modules/
 dist/
 web-build/
 expo-env.d.ts
-
+*.md*
+*.sh*
 # Native
 .kotlin/
 *.orig.*
@@ -17,6 +18,11 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
+
+# Google Play / App Store
+google-play-service-account.json
+upload-keystore.jks
+keystore.properties
 
 # Metro
 .metro-health-check*
