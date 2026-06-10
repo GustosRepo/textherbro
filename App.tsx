@@ -21,6 +21,21 @@ import { ensureNotificationsInitialized, registerForPushNotifications, scheduleR
 import { ensureStorageSchema, getSettings } from './src/services/storage';
 import { initializeRevenueCat, checkSubscriptionStatus } from './src/services/paywall';
 import { trackEvent } from './src/services/analytics';
+import * as Sentry from '@sentry/react-native';
+
+Sentry.init({
+  dsn: 'https://60d0169094e2a582d2032b44b1540194@o4511536973545472.ingest.us.sentry.io/4511539414237184',
+
+  // Adds more context data to events (IP address, cookies, user, etc.)
+  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
+  sendDefaultPii: true,
+
+  // Enable Logs
+  enableLogs: true,
+
+  // uncomment the line below to enable Spotlight (https://spotlightjs.com)
+  // spotlight: __DEV__,
+});
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -78,7 +93,7 @@ function TabNavigator() {
 
 const ONBOARDING_KEY = '@textherbro_onboarding_done';
 
-export default function App() {
+export default Sentry.wrap(function App() {
   const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -146,5 +161,4 @@ export default function App() {
       </NavigationContainer>
     </>
   );
-}
-
+});

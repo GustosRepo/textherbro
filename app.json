@@ -64,6 +64,14 @@
             "NSUserNotificationsUsageDescription": "TextHerBro sends daily reminders to help you stay consistent with your partner."
           }
         }
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "textherbro",
+          "organization": "codewerx-llc"
+        }
       ]
     ],
     "extra": {
